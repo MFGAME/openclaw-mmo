@@ -1,0 +1,24 @@
+{
+  "name": "openclaw-mmo-web",
+  "version": "0.1.0",
+  "description": "OpenClaw MMO - 网页版宝可梦游戏",
+  "main": "dist/main.js",
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "serve": "npx serve . -p 8080",
+    "clean": "rm -rf dist"
+  },
+  "keywords": [
+    "game",
+    "mmo",
+    "tuxemon",
+    "pokemon"
+  ],
+  "author": "OpenClaw Team",
+  "license": "MIT",
+  "devDependencies": {
+    "typescript": "^5.3.3"
+  },
+  "type": "module"
+}
