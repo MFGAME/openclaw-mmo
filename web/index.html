@@ -1,0 +1,805 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OpenClaw MMO - Web版</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: #333;
+            overflow-x: hidden;
+        }
+        
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        
+        header {
+            text-align: center;
+            color: white;
+            padding: 20px 0;
+        }
+        
+        h1 {
+            font-size: 3em;
+            text-shadow: 3px 3px 6px rgba(0,0,0,0.3);
+            margin-bottom: 10px;
+        }
+        
+        .subtitle {
+            font-size: 1.2em;
+            opacity: 0.9;
+        }
+        
+        .status-bar {
+            background: white;
+            padding: 20px;
+            border-radius: 15px;
+            margin: 20px 0;
+            display: flex;
+            justify-content: space-around;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+        }
+        
+        .status-item {
+            text-align: center;
+        }
+        
+        .status-number {
+            font-size: 2.5em;
+            font-weight: bold;
+            color: #667eea;
+        }
+        
+        .status-label {
+            font-size: 0.9em;
+            color: #666;
+            margin-top: 5px;
+        }
+        
+        .tabs {
+            display: flex;
+            gap: 10px;
+            margin: 20px 0;
+        }
+        
+        .tab {
+            flex: 1;
+            padding: 15px;
+            background: white;
+            border: none;
+            border-radius: 10px;
+            font-size: 1.1em;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        
+        .tab:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+        }
+        
+        .tab.active {
+            background: #667eea;
+            color: white;
+        }
+        
+        .content {
+            background: white;
+            border-radius: 15px;
+            padding: 30px;
+            min-height: 600px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.2);
+        }
+        
+        .battle-arena {
+            display: none;
+        }
+        
+        .battle-arena.active {
+            display: block;
+        }
+        
+        .arena-container {
+            display: grid;
+            grid-template-columns: 1fr 100px 1fr;
+            gap: 20px;
+            margin: 30px 0;
+            align-items: center;
+        }
+        
+        .player-side {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 10px;
+            text-align: center;
+        }
+        
+        .player-side.player1 {
+            border-left: 5px solid #28a745;
+        }
+        
+        .player-side.player2 {
+            border-right: 5px solid #dc3545;
+        }
+        
+        .player-name {
+            font-size: 1.5em;
+            font-weight: bold;
+            margin-bottom: 15px;
+        }
+        
+        .monster-sprite {
+            width: 200px;
+            height: 200px;
+            margin: 20px auto;
+            background-image: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200"><rect fill="%23e9ecef" width="200" height="200"/><text x="50%" y="50%" text-anchor="middle" dy=".3em" font-size="60">🎮</text></svg>');
+            background-size: contain;
+            background-repeat: no-repeat;
+            background-position: center;
+            border-radius: 10px;
+            position: relative;
+        }
+        
+        .monster-sprite.loading::after {
+            content: '加载中...';
+            position: absolute;
+            bottom: -30px;
+            left: 50%;
+            transform: translateX(-50%);
+            color: #666;
+            font-size: 0.9em;
+        }
+        
+        .monster-info {
+            margin: 15px 0;
+        }
+        
+        .monster-name {
+            font-size: 1.3em;
+            font-weight: bold;
+            color: #667eea;
+        }
+        
+        .monster-level {
+            color: #666;
+            margin-left: 10px;
+        }
+        
+        .hp-bar-container {
+            background: #e9ecef;
+            border-radius: 20px;
+            height: 30px;
+            overflow: hidden;
+            margin: 10px 0;
+        }
+        
+        .hp-bar {
+            height: 100%;
+            background: linear-gradient(90deg, #28a745, #20c997);
+            transition: width 0.5s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: bold;
+        }
+        
+        .hp-bar.warning {
+            background: linear-gradient(90deg, #ffc107, #fd7e14);
+        }
+        
+        .hp-bar.danger {
+            background: linear-gradient(90deg, #dc3545, #c82333);
+        }
+        
+        .stats {
+            display: flex;
+            justify-content: space-around;
+            margin: 15px 0;
+            font-size: 0.9em;
+        }
+        
+        .stat {
+            text-align: center;
+        }
+        
+        .stat-label {
+            color: #666;
+            font-size: 0.8em;
+        }
+        
+        .stat-value {
+            font-weight: bold;
+            color: #333;
+        }
+        
+        .vs-text {
+            font-size: 3em;
+            font-weight: bold;
+            color: #dc3545;
+            text-align: center;
+            animation: pulse 2s infinite;
+        }
+        
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.1); }
+        }
+        
+        .battle-log {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 10px;
+            max-height: 200px;
+            overflow-y: auto;
+            margin: 20px 0;
+        }
+        
+        .log-entry {
+            padding: 8px;
+            margin: 5px 0;
+            border-left: 3px solid #667eea;
+            background: white;
+            border-radius: 5px;
+        }
+        
+        .log-turn {
+            font-weight: bold;
+            color: #667eea;
+        }
+        
+        .log-damage {
+            color: #dc3545;
+            font-weight: bold;
+        }
+        
+        .battle-list {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 20px;
+        }
+        
+        .battle-card {
+            background: white;
+            border: 2px solid #e9ecef;
+            border-radius: 10px;
+            padding: 20px;
+            transition: all 0.3s;
+            cursor: pointer;
+        }
+        
+        .battle-card:hover {
+            border-color: #667eea;
+            transform: translateY(-5px);
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+        }
+        
+        .battle-card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+        
+        .battle-id {
+            font-weight: bold;
+            color: #667eea;
+        }
+        
+        .battle-status {
+            padding: 5px 15px;
+            border-radius: 20px;
+            font-size: 0.9em;
+            font-weight: bold;
+        }
+        
+        .status-ongoing {
+            background: #28a745;
+            color: white;
+        }
+        
+        .status-completed {
+            background: #6c757d;
+            color: white;
+        }
+        
+        .robot-list {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+            gap: 20px;
+        }
+        
+        .robot-card {
+            background: white;
+            border: 2px solid #e9ecef;
+            border-radius: 10px;
+            padding: 20px;
+            transition: all 0.3s;
+        }
+        
+        .robot-card:hover {
+            border-color: #667eea;
+        }
+        
+        .robot-name {
+            font-size: 1.3em;
+            font-weight: bold;
+            margin-bottom: 10px;
+        }
+        
+        .robot-status {
+            display: inline-block;
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: #28a745;
+            margin-right: 5px;
+        }
+        
+        .action-buttons {
+            display: flex;
+            gap: 10px;
+            margin: 20px 0;
+        }
+        
+        .btn {
+            padding: 12px 30px;
+            border: none;
+            border-radius: 8px;
+            font-size: 1em;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        
+        .btn-primary {
+            background: #667eea;
+            color: white;
+        }
+        
+        .btn-primary:hover {
+            background: #5568d3;
+            transform: translateY(-2px);
+        }
+        
+        .btn-danger {
+            background: #dc3545;
+            color: white;
+        }
+        
+        .btn-danger:hover {
+            background: #c82333;
+        }
+        
+        .loading {
+            text-align: center;
+            padding: 50px;
+            color: #666;
+        }
+        
+        .hidden {
+            display: none !important;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🎮 OpenClaw MMO - Web版</h1>
+            <p class="subtitle">基于Tuxemon的实时在线对战平台</p>
+        </header>
+        
+        <div class="status-bar">
+            <div class="status-item">
+                <div class="status-number" id="onlineRobots">0</div>
+                <div class="status-label">在线玩家</div>
+            </div>
+            <div class="status-item">
+                <div class="status-number" id="totalMonsters">0</div>
+                <div class="status-label">总怪物数</div>
+            </div>
+            <div class="status-item">
+                <div class="status-number" id="activeBattles">0</div>
+                <div class="status-label">进行中对战</div>
+            </div>
+            <div class="status-item">
+                <div class="status-number" id="completedBattles">0</div>
+                <div class="status-label">已完成对战</div>
+            </div>
+        </div>
+        
+        <div class="tabs">
+            <button class="tab active" onclick="showTab('spectate')">观战</button>
+            <button class="tab" onclick="showTab('battles')">对战列表</button>
+            <button class="tab" onclick="showTab('robots')">在线玩家</button>
+            <button class="tab" onclick="showTab('start')">开始对战</button>
+        </div>
+        
+        <div class="content">
+            <!-- 观战模式 -->
+            <div id="spectate-tab" class="battle-arena active">
+                <div class="loading" id="selectBattleHint">
+                    <p>👆 从左侧选择一场对战开始观战</p>
+                </div>
+                
+                <div id="battleView" class="hidden">
+                    <h2 style="text-align: center; margin-bottom: 20px;">
+                        正在观战: <span id="currentBattleId"></span>
+                    </h2>
+                    
+                    <div class="arena-container">
+                        <!-- 玩家1 -->
+                        <div class="player-side player1">
+                            <div class="player-name" id="player1Name">玩家 1</div>
+                            <div class="monster-sprite" id="player1Sprite">🔥</div>
+                            <div class="monster-info">
+                                <span class="monster-name" id="player1Monster">Monster</span>
+                                <span class="monster-level" id="player1Level">Lv.5</span>
+                            </div>
+                            <div class="hp-bar-container">
+                                <div class="hp-bar" id="player1HP" style="width: 100%;">
+                                    <span id="player1HPText">100/100</span>
+                                </div>
+                            </div>
+                            <div class="stats">
+                                <div class="stat">
+                                    <div class="stat-label">攻击</div>
+                                    <div class="stat-value" id="player1Atk">50</div>
+                                </div>
+                                <div class="stat">
+                                    <div class="stat-label">防御</div>
+                                    <div class="stat-value" id="player1Def">40</div>
+                                </div>
+                                <div class="stat">
+                                    <div class="stat-label">速度</div>
+                                    <div class="stat-value" id="player1Spd">30</div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- VS -->
+                        <div class="vs-text">VS</div>
+                        
+                        <!-- 玩家2 -->
+                        <div class="player-side player2">
+                            <div class="player-name" id="player2Name">玩家 2</div>
+                            <div class="monster-sprite" id="player2Sprite">💧</div>
+                            <div class="monster-info">
+                                <span class="monster-name" id="player2Monster">Monster</span>
+                                <span class="monster-level" id="player2Level">Lv.5</span>
+                            </div>
+                            <div class="hp-bar-container">
+                                <div class="hp-bar" id="player2HP" style="width: 100%;">
+                                    <span id="player2HPText">100/100</span>
+                                </div>
+                            </div>
+                            <div class="stats">
+                                <div class="stat">
+                                    <div class="stat-label">攻击</div>
+                                    <div class="stat-value" id="player2Atk">50</div>
+                                </div>
+                                <div class="stat">
+                                    <div class="stat-label">防御</div>
+                                    <div class="stat-value" id="player2Def">40</div>
+                                </div>
+                                <div class="stat">
+                                    <div class="stat-label">速度</div>
+                                    <div class="stat-value" id="player2Spd">30</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- 战斗日志 -->
+                    <div class="battle-log">
+                        <h3>战斗日志</h3>
+                        <div id="battleLog"></div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- 对战列表 -->
+            <div id="battles-tab" class="battle-arena">
+                <h2 style="margin-bottom: 20px;">对战列表</h2>
+                <div class="battle-list" id="battleList">
+                    <div class="loading">加载中...</div>
+                </div>
+            </div>
+            
+            <!-- 在线玩家 -->
+            <div id="robots-tab" class="battle-arena">
+                <h2 style="margin-bottom: 20px;">在线玩家</h2>
+                <div class="robot-list" id="robotList">
+                    <div class="loading">加载中...</div>
+                </div>
+            </div>
+            
+            <!-- 开始对战 -->
+            <div id="start-tab" class="battle-arena">
+                <h2 style="margin-bottom: 20px;">开始新对战</h2>
+                <p>点击下方按钮开始自动对战演示</p>
+                <div class="action-buttons">
+                    <button class="btn btn-primary" onclick="startBattle()">开始对战</button>
+                    <button class="btn btn-danger" onclick="stopBattle()">停止</button>
+                </div>
+                <div id="battleOutput" style="margin-top: 20px; padding: 20px; background: #f8f9fa; border-radius: 10px;"></div>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        const API_URL = 'http://localhost:8000';
+        let currentBattleId = null;
+        let refreshInterval = null;
+        
+        // 怪物emoji映射
+        const monsterEmojis = {
+            'fire': '🔥', 'water': '💧', 'grass': '🌿',
+            'electric': '⚡', 'ice': '❄️', 'fighting': '👊',
+            'poison': '☠️', 'ground': '🌍', 'flying': '🦅',
+            'psychic': '🔮', 'bug': '🐛', 'rock': '🪨',
+            'ghost': '👻', 'dragon': '🐉', 'dark': '🌑',
+            'steel': '⚙️', 'fairy': '🧚', 'normal': '⭐'
+        };
+        
+        function getMonsterEmoji(types) {
+            if (!types || types.length === 0) return '⭐';
+            return monsterEmojis[types[0]] || '⭐';
+        }
+        
+        // 加载怪物精灵图
+        async function loadMonsterSprite(monsterSlug, elementId) {
+            const spriteElement = document.getElementById(elementId);
+            
+            try {
+                const response = await fetch(`${API_URL}/api/sprite/${monsterSlug}/frame/1`);
+                if (response.ok) {
+                    const blob = await response.blob();
+                    const url = URL.createObjectURL(blob);
+                    spriteElement.style.backgroundImage = `url(${url})`;
+                    spriteElement.innerHTML = '';
+                }
+            } catch (error) {
+                // 失败时显示emoji
+                spriteElement.innerHTML = getMonsterEmoji(['normal']);
+            }
+        }
+        
+        // 标签页切换
+        function showTab(tabName) {
+            // 隐藏所有标签页
+            document.querySelectorAll('.battle-arena').forEach(tab => {
+                tab.classList.remove('active');
+            });
+            
+            // 移除所有标签的active状态
+            document.querySelectorAll('.tab').forEach(tab => {
+                tab.classList.remove('active');
+            });
+            
+            // 显示选中的标签页
+            document.getElementById(`${tabName}-tab`).classList.add('active');
+            event.target.classList.add('active');
+        }
+        
+        // 获取世界状态
+        async function fetchWorldStatus() {
+            try {
+                const response = await fetch(`${API_URL}/api/world/status`);
+                const data = await response.json();
+                
+                document.getElementById('onlineRobots').textContent = data.online_robots;
+                document.getElementById('totalMonsters').textContent = data.total_monsters;
+                document.getElementById('activeBattles').textContent = data.active_battles;
+                document.getElementById('completedBattles').textContent = data.completed_battles;
+            } catch (error) {
+                console.error('获取状态失败:', error);
+            }
+        }
+        
+        // 获取对战列表
+        async function fetchBattles() {
+            try {
+                const response = await fetch(`${API_URL}/api/battles`);
+                const data = await response.json();
+                
+                const battleList = document.getElementById('battleList');
+                if (data.battles.length === 0) {
+                    battleList.innerHTML = '<div class="loading">暂无对战</div>';
+                    return;
+                }
+                
+                battleList.innerHTML = data.battles.map(battle => `
+                    <div class="battle-card" onclick="watchBattle('${battle.id}')">
+                        <div class="battle-card-header">
+                            <div class="battle-id">对战 #${battle.id.substr(0, 8)}</div>
+                            <div class="battle-status status-${battle.status}">
+                                ${battle.status === 'ongoing' ? '进行中' : '已完成'}
+                            </div>
+                        </div>
+                        <p><strong>回合:</strong> ${battle.current_turn}</p>
+                        <p><strong>日志:</strong> ${battle.logs.length} 条</p>
+                        ${battle.status === 'ongoing' ? '<p style="color: #667eea; margin-top: 10px;">点击观战 →</p>' : ''}
+                    </div>
+                `).join('');
+            } catch (error) {
+                console.error('获取对战列表失败:', error);
+            }
+        }
+        
+        // 获取机器人列表
+        async function fetchRobots() {
+            try {
+                const response = await fetch(`${API_URL}/api/robots`);
+                const data = await response.json();
+                
+                const robotList = document.getElementById('robotList');
+                if (data.robots.length === 0) {
+                    robotList.innerHTML = '<div class="loading">暂无在线玩家</div>';
+                    return;
+                }
+                
+                robotList.innerHTML = data.robots.map(robot => `
+                    <div class="robot-card">
+                        <div class="robot-name">
+                            <span class="robot-status"></span>
+                            ${robot.name}
+                        </div>
+                        <p><strong>性格:</strong> ${robot.personality}</p>
+                        <p><strong>等级:</strong> ${robot.level}</p>
+                        <p><strong>金币:</strong> ${robot.gold}</p>
+                    </div>
+                `).join('');
+            } catch (error) {
+                console.error('获取机器人列表失败:', error);
+            }
+        }
+        
+        // 观战
+        async function watchBattle(battleId) {
+            currentBattleId = battleId;
+            
+            // 切换到观战标签
+            document.querySelectorAll('.battle-arena').forEach(tab => tab.classList.remove('active'));
+            document.querySelectorAll('.tab').forEach(tab => tab.classList.remove('active'));
+            document.getElementById('spectate-tab').classList.add('active');
+            document.querySelector('[onclick="showTab(\'spectate\')"]').classList.add('active');
+            
+            // 隐藏提示，显示对战
+            document.getElementById('selectBattleHint').classList.add('hidden');
+            document.getElementById('battleView').classList.remove('hidden');
+            
+            // 更新对战信息
+            await updateBattleView();
+        }
+        
+        // 更新对战视图
+        async function updateBattleView() {
+            if (!currentBattleId) return;
+            
+            try {
+                const response = await fetch(`${API_URL}/api/battle/${currentBattleId}`);
+                const data = await response.json();
+                const battle = data.battle;
+                
+                // 更新对战ID
+                document.getElementById('currentBattleId').textContent = `#${currentBattleId.substr(0, 8)}`;
+                
+                // 更新玩家1信息
+                if (battle.player1_monsters.length > 0) {
+                    const m1 = battle.player1_monsters[0];
+                    document.getElementById('player1Name').textContent = battle.player1_id.substr(0, 8);
+                    document.getElementById('player1Monster').textContent = m1.name;
+                    document.getElementById('player1Level').textContent = `Lv.${m1.level}`;
+                    
+                    // 加载精灵图
+                    await loadMonsterSprite(m1.slug, 'player1Sprite');
+                    
+                    const hp1Percent = (m1.hp / m1.max_hp) * 100;
+                    const hp1Bar = document.getElementById('player1HP');
+                    hp1Bar.style.width = `${hp1Percent}%`;
+                    hp1Bar.className = 'hp-bar' + (hp1Percent < 25 ? ' danger' : hp1Percent < 50 ? ' warning' : '');
+                    document.getElementById('player1HPText').textContent = `${m1.hp}/${m1.max_hp}`;
+                    
+                    document.getElementById('player1Atk').textContent = m1.attack;
+                    document.getElementById('player1Def').textContent = m1.defense;
+                    document.getElementById('player1Spd').textContent = m1.speed;
+                }
+                
+                // 更新玩家2信息
+                if (battle.player2_monsters.length > 0) {
+                    const m2 = battle.player2_monsters[0];
+                    document.getElementById('player2Name').textContent = battle.player2_id.substr(0, 8);
+                    document.getElementById('player2Monster').textContent = m2.name;
+                    document.getElementById('player2Level').textContent = `Lv.${m2.level}`;
+                    
+                    // 加载精灵图
+                    await loadMonsterSprite(m2.slug, 'player2Sprite');
+                    
+                    const hp2Percent = (m2.hp / m2.max_hp) * 100;
+                    const hp2Bar = document.getElementById('player2HP');
+                    hp2Bar.style.width = `${hp2Percent}%`;
+                    hp2Bar.className = 'hp-bar' + (hp2Percent < 25 ? ' danger' : hp2Percent < 50 ? ' warning' : '');
+                    document.getElementById('player2HPText').textContent = `${m2.hp}/${m2.max_hp}`;
+                    
+                    document.getElementById('player2Atk').textContent = m2.attack;
+                    document.getElementById('player2Def').textContent = m2.defense;
+                    document.getElementById('player2Spd').textContent = m2.speed;
+                }
+                
+                // 更新战斗日志
+                const logDiv = document.getElementById('battleLog');
+                logDiv.innerHTML = battle.logs.map(log => `
+                    <div class="log-entry">
+                        <span class="log-turn">[回合 ${log.turn}]</span>
+                        ${log.attacker} 使用 ${log.technique} 攻击 ${log.defender}，
+                        <span class="log-damage">造成 ${log.damage} 点伤害</span>
+                        (${log.type_effectiveness})
+                    </div>
+                `).join('');
+                
+            } catch (error) {
+                console.error('更新对战视图失败:', error);
+            }
+        }
+        
+        // 开始对战
+        async function startBattle() {
+            const output = document.getElementById('battleOutput');
+            output.innerHTML = '<p>正在创建对战...</p>';
+            
+            try {
+                // 这里可以调用自动对战脚本
+                output.innerHTML += '<p>✅ 对战已开始！请查看"对战列表"或"观战"标签</p>';
+                
+                // 刷新数据
+                await fetchWorldStatus();
+                await fetchBattles();
+            } catch (error) {
+                output.innerHTML += `<p>❌ 错误: ${error.message}</p>`;
+            }
+        }
+        
+        // 停止对战
+        function stopBattle() {
+            if (refreshInterval) {
+                clearInterval(refreshInterval);
+            }
+            document.getElementById('battleOutput').innerHTML = '<p>已停止</p>';
+        }
+        
+        // 定期刷新
+        function startAutoRefresh() {
+            // 每5秒刷新一次
+            refreshInterval = setInterval(async () => {
+                await fetchWorldStatus();
+                
+                if (currentBattleId) {
+                    await updateBattleView();
+                }
+            }, 5000);
+        }
+        
+        // 初始化
+        async function init() {
+            await fetchWorldStatus();
+            await fetchBattles();
+            await fetchRobots();
+            startAutoRefresh();
+        }
+        
+        // 页面加载完成后初始化
+        window.addEventListener('load', init);
+    </script>
+</body>
+</html>

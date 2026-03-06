@@ -1,0 +1,384 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OpenClaw MMO - Tuxemon Web</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            background: #228B22;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            font-family: Arial, sans-serif;
+        }
+        #game-container {
+            width: 800px;
+            height: 600px;
+            background: #000;
+            position: relative;
+            overflow: hidden;
+        }
+        canvas {
+            display: block;
+        }
+    </style>
+</head>
+<body>
+    <div id="game-container"></div>
+    
+    <script>
+        // ==================== 简化版游戏 ====================
+        const TILE_SIZE = 32;
+        const MAP_WIDTH = 25;
+        const MAP_HEIGHT = 18;
+        
+        // 游戏状态
+        const state = {
+            player: { x: 5, y: 5, monsters: [] },
+            npcs: [],
+            inBattle: false,
+            currentDialog: null
+        };
+        
+        // 怪物数据
+        const MONSTERS = {
+            flambear: { name: 'Flambear', type: 'fire', hp: 70, atk: 70, def: 40, spd: 50 },
+            dollfin: { name: 'Dollfin', type: 'water', hp: 75, atk: 55, def: 45, spd: 55 },
+            budaye: { name: 'Budaye', type: 'grass', hp: 78, atk: 50, def: 50, spd: 45 }
+        };
+        
+        // 属性克制
+        const TYPE_CHART = {
+            fire: { grass: 2, water: 0.5 },
+            water: { fire: 2, grass: 0.5 },
+            grass: { water: 2, fire: 0.5 }
+        };
+        
+        // 地图数据
+        const map = [];
+        for (let y = 0; y < MAP_HEIGHT; y++) {
+            map[y] = [];
+            for (let x = 0; x < MAP_WIDTH; x++) {
+                // 边界是墙
+                if (x === 0 || x === MAP_WIDTH - 1 || y === 0 || y === MAP_HEIGHT - 1) {
+                    map[y][x] = 1;
+                }
+                // 草丛区域
+                else if ((x >= 3 && x <= 6 && y >= 3 && y <= 6) || 
+                         (x >= 15 && x <= 20 && y >= 10 && y <= 15)) {
+                    map[y][x] = 2;
+                }
+                // NPC位置
+                else if (x === 12 && y === 8) {
+                    map[y][x] = 3;
+                    state.npcs.push({ x, y, type: 'professor' });
+                }
+                // 普通地面
+                else {
+                    map[y][x] = 0;
+                }
+            }
+        }
+        
+        // Canvas设置
+        const container = document.getElementById('game-container');
+        const canvas = document.createElement('canvas');
+        canvas.width = 800;
+        canvas.height = 600;
+        container.appendChild(canvas);
+        const ctx = canvas.getContext('2d');
+        
+        // 游戏主循环
+        function gameLoop() {
+            update();
+            render();
+            requestAnimationFrame(gameLoop);
+        }
+        
+        // 更新逻辑
+        function update() {
+            if (state.inBattle) return;
+            
+            // 检查草丛遭遇
+            const tile = map[state.player.y][state.player.x];
+            if (tile === 2 && Math.random() < 0.02) {
+                startBattle();
+            }
+        }
+        
+        // 渲染
+        function render() {
+            ctx.fillStyle = '#228B22';
+            ctx.fillRect(0, 0, 800, 600);
+            
+            // 绘制地图
+            for (let y = 0; y < MAP_HEIGHT; y++) {
+                for (let x = 0; x < MAP_WIDTH; x++) {
+                    const tile = map[y][x];
+                    const px = x * TILE_SIZE;
+                    const py = y * TILE_SIZE;
+                    
+                    if (tile === 1) {
+                        ctx.fillStyle = '#4a4a4a';
+                        ctx.fillRect(px, py, TILE_SIZE, TILE_SIZE);
+                    } else if (tile === 2) {
+                        ctx.fillStyle = '#32CD32';
+                        ctx.fillRect(px, py, TILE_SIZE, TILE_SIZE);
+                    } else if (tile === 3) {
+                        ctx.fillStyle = '#FFD700';
+                        ctx.fillRect(px, py, TILE_SIZE, TILE_SIZE);
+                    } else {
+                        ctx.fillStyle = '#C0C0C0';
+                        ctx.fillRect(px, py, TILE_SIZE, TILE_SIZE);
+                    }
+                }
+            }
+            
+            // 绘制NPC
+            ctx.fillStyle = '#FF00FF';
+            state.npcs.forEach(npc => {
+                ctx.fillRect(npc.x * TILE_SIZE, npc.y * TILE_SIZE, TILE_SIZE, TILE_SIZE);
+            });
+            
+            // 绘制玩家
+            ctx.fillStyle = '#0000FF';
+            ctx.fillRect(
+                state.player.x * TILE_SIZE + 4,
+                state.player.y * TILE_SIZE + 4,
+                TILE_SIZE - 8,
+                TILE_SIZE - 8
+            );
+            
+            // 绘制UI
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+            ctx.fillRect(10, 10, 200, 80);
+            ctx.fillStyle = '#FFF';
+            ctx.font = '14px Arial';
+            ctx.fillText('OpenClaw MMO - Tuxemon', 20, 30);
+            ctx.fillText(`Player: (${state.player.x}, ${state.player.y})`, 20, 50);
+            ctx.fillText('Monsters: ' + state.player.monsters.length, 20, 70);
+            
+            // 控制提示
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+            ctx.fillRect(10, 560, 780, 30);
+            ctx.fillStyle = '#FFF';
+            ctx.font = '12px Arial';
+            ctx.fillText('Controls: WASD/Arrows = Move | SPACE = Interact with NPC (yellow square)', 20, 580);
+            
+            // 对话框
+            if (state.currentDialog) {
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.9)';
+                ctx.fillRect(50, 450, 700, 100);
+                ctx.fillStyle = '#FFF';
+                ctx.font = '16px Arial';
+                ctx.fillText(state.currentDialog, 70, 490);
+                ctx.fillText('Press SPACE to continue', 70, 520);
+            }
+            
+            // 战斗界面
+            if (state.inBattle) {
+                renderBattle();
+            }
+        }
+        
+        // 战斗渲染
+        function renderBattle() {
+            ctx.fillStyle = '#87CEEB';
+            ctx.fillRect(0, 0, 800, 600);
+            
+            // 玩家怪物
+            ctx.fillStyle = '#FF6B6B';
+            ctx.fillRect(100, 350, 200, 100);
+            ctx.fillStyle = '#000';
+            ctx.font = '18px Arial';
+            ctx.fillText(state.playerMonster.name + ' Lv.' + state.playerMonster.level, 120, 380);
+            ctx.fillText(`HP: ${state.playerMonster.hp}/${state.playerMonster.maxHp}`, 120, 410);
+            
+            // 敌方怪物
+            ctx.fillStyle = '#4ECDC4';
+            ctx.fillRect(500, 150, 200, 100);
+            ctx.fillStyle = '#000';
+            ctx.fillText(state.enemyMonster.name + ' Lv.' + state.enemyMonster.level, 520, 180);
+            ctx.fillText(`HP: ${state.enemyMonster.hp}/${state.enemyMonster.maxHp}`, 520, 210);
+            
+            // 战斗日志
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
+            ctx.fillRect(50, 480, 700, 100);
+            ctx.fillStyle = '#FFF';
+            ctx.font = '14px Arial';
+            ctx.fillText(state.battleLog, 70, 520);
+            
+            // 技能按钮
+            const skills = ['Tackle', 'Fire Blast'];
+            skills.forEach((skill, i) => {
+                ctx.fillStyle = '#667eea';
+                ctx.fillRect(150 + i * 200, 450, 180, 30);
+                ctx.fillStyle = '#FFF';
+                ctx.fillText(skill, 200 + i * 200, 470);
+            });
+            
+            // 捕捉按钮
+            ctx.fillStyle = '#FFD700';
+            ctx.fillRect(550, 450, 180, 30);
+            ctx.fillStyle = '#000';
+            ctx.fillText('Catch', 600, 470);
+        }
+        
+        // 战斗开始
+        function startBattle() {
+            state.inBattle = true;
+            
+            // 随机怪物
+            const monsterKeys = Object.keys(MONSTERS);
+            const randomMonster = monsterKeys[Math.floor(Math.random() * monsterKeys.length)];
+            const monsterData = MONSTERS[randomMonster];
+            
+            state.enemyMonster = {
+                ...monsterData,
+                level: Math.floor(Math.random() * 3) + 2,
+                hp: monsterData.hp,
+                maxHp: monsterData.hp
+            };
+            
+            // 如果没有怪物，给一个初始的
+            if (state.player.monsters.length === 0) {
+                state.playerMonster = {
+                    ...MONSTERS.flambear,
+                    level: 5,
+                    hp: 70,
+                    maxHp: 70
+                };
+                state.player.monsters.push(state.playerMonster);
+            } else {
+                state.playerMonster = { ...state.player.monsters[0] };
+            }
+            
+            state.battleLog = `A wild ${state.enemyMonster.name} appeared! Click a skill to attack!`;
+        }
+        
+        // 战斗回合
+        function battleTurn(skillIndex) {
+            const damage = Math.floor(Math.random() * 30) + 20;
+            state.enemyMonster.hp = Math.max(0, state.enemyMonster.hp - damage);
+            
+            state.battleLog = `Your monster dealt ${damage} damage!`;
+            
+            if (state.enemyMonster.hp <= 0) {
+                state.battleLog = 'You won! Click anywhere to continue.';
+                setTimeout(() => {
+                    state.inBattle = false;
+                }, 1000);
+                return;
+            }
+            
+            // 敌方反击
+            setTimeout(() => {
+                const enemyDamage = Math.floor(Math.random() * 20) + 15;
+                state.playerMonster.hp = Math.max(0, state.playerMonster.hp - enemyDamage);
+                state.battleLog = `Enemy dealt ${enemyDamage} damage!`;
+                
+                if (state.playerMonster.hp <= 0) {
+                    state.battleLog = 'You lost! Click anywhere to continue.';
+                    setTimeout(() => {
+                        state.inBattle = false;
+                        state.playerMonster.hp = state.playerMonster.maxHp;
+                    }, 1000);
+                }
+            }, 500);
+        }
+        
+        // 捕捉
+        function attemptCatch() {
+            const hpRatio = state.enemyMonster.hp / state.enemyMonster.maxHp;
+            const catchRate = (1 - hpRatio) * 0.5 + 0.2;
+            
+            if (Math.random() < catchRate) {
+                state.player.monsters.push({ ...state.enemyMonster, hp: state.enemyMonster.maxHp });
+                state.battleLog = `Gotcha! ${state.enemyMonster.name} was caught!`;
+                setTimeout(() => {
+                    state.inBattle = false;
+                }, 1000);
+            } else {
+                state.battleLog = 'Oh no! The monster broke free!';
+            }
+        }
+        
+        // 键盘控制
+        document.addEventListener('keydown', (e) => {
+            if (state.inBattle) return;
+            
+            const key = e.key.toLowerCase();
+            let newX = state.player.x;
+            let newY = state.player.y;
+            
+            if (key === 'w' || key === 'arrowup') newY--;
+            if (key === 's' || key === 'arrowdown') newY++;
+            if (key === 'a' || key === 'arrowleft') newX--;
+            if (key === 'd' || key === 'arrowright') newX++;
+            
+            // 碰撞检测
+            if (newX >= 0 && newX < MAP_WIDTH && newY >= 0 && newY < MAP_HEIGHT) {
+                if (map[newY][newX] !== 1) {
+                    state.player.x = newX;
+                    state.player.y = newY;
+                }
+            }
+            
+            // 空格交互
+            if (key === ' ') {
+                // 检查NPC
+                const nearbyNpc = state.npcs.find(npc => {
+                    const dist = Math.abs(npc.x - state.player.x) + Math.abs(npc.y - state.player.y);
+                    return dist <= 1;
+                });
+                
+                if (nearbyNpc) {
+                    if (!state.currentDialog) {
+                        state.currentDialog = 'Professor Oak: Welcome! Here is your first monster - Flambear!';
+                        if (state.player.monsters.length === 0) {
+                            const starter = {
+                                ...MONSTERS.flambear,
+                                level: 5,
+                                hp: 70,
+                                maxHp: 70
+                            };
+                            state.player.monsters.push(starter);
+                        }
+                    } else {
+                        state.currentDialog = null;
+                    }
+                }
+            }
+        });
+        
+        // 鼠标点击（战斗中）
+        canvas.addEventListener('click', (e) => {
+            if (!state.inBattle) return;
+            
+            const rect = canvas.getBoundingClientRect();
+            const x = e.clientX - rect.left;
+            const y = e.clientY - rect.top;
+            
+            // 技能1
+            if (x >= 150 && x <= 330 && y >= 450 && y <= 480) {
+                battleTurn(0);
+            }
+            // 技能2
+            else if (x >= 350 && x <= 530 && y >= 450 && y <= 480) {
+                battleTurn(1);
+            }
+            // 捕捉
+            else if (x >= 550 && x <= 730 && y >= 450 && y <= 480) {
+                attemptCatch();
+            }
+        });
+        
+        // 启动游戏
+        console.log('🎮 Game starting...');
+        gameLoop();
+    </script>
+</body>
+</html>

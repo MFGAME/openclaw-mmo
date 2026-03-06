@@ -1,0 +1,645 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OpenClaw MMO - Tuxemon Web (Game Boy Edition)</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-family: Arial, sans-serif;
+            overflow: hidden;
+        }
+        
+        /* Game Boy外壳 */
+        .gameboy {
+            width: 480px;
+            height: 780px;
+            background: linear-gradient(145deg, #c3c3c3, #9a9a9a);
+            border-radius: 20px 20px 80px 20px;
+            padding: 40px 40px 60px 40px;
+            box-shadow: 
+                0 20px 60px rgba(0,0,0,0.5),
+                inset 0 2px 3px rgba(255,255,255,0.3),
+                inset 0 -2px 3px rgba(0,0,0,0.2);
+            position: relative;
+        }
+        
+        /* Game Boy品牌标识 */
+        .gameboy-brand {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        
+        .gameboy-logo {
+            font-size: 28px;
+            font-weight: bold;
+            font-style: italic;
+            background: linear-gradient(180deg, #4a4a4a, #2a2a2a);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            letter-spacing: -2px;
+        }
+        
+        .gameboy-model {
+            font-size: 12px;
+            color: #4a4a4a;
+            font-weight: bold;
+            letter-spacing: 4px;
+            margin-top: 5px;
+        }
+        
+        /* 屏幕区域 */
+        .screen-container {
+            background: #4a4a4a;
+            padding: 25px 20px 35px 20px;
+            border-radius: 10px;
+            box-shadow: 
+                inset 0 5px 15px rgba(0,0,0,0.5),
+                0 2px 5px rgba(255,255,255,0.2);
+            margin-bottom: 30px;
+        }
+        
+        .screen-bezel {
+            background: #8b8b8b;
+            padding: 3px;
+            border-radius: 5px;
+            box-shadow: inset 0 2px 5px rgba(0,0,0,0.3);
+        }
+        
+        #game-screen {
+            width: 320px;
+            height: 288px;
+            background: #9bbc0f;
+            border: none;
+            display: block;
+            image-rendering: pixelated;
+            image-rendering: crisp-edges;
+        }
+        
+        /* 电源指示灯 */
+        .power-led {
+            display: flex;
+            align-items: center;
+            margin-top: 10px;
+        }
+        
+        .led-light {
+            width: 12px;
+            height: 12px;
+            background: #ff0000;
+            border-radius: 50%;
+            box-shadow: 0 0 10px #ff0000;
+            animation: blink 2s infinite;
+        }
+        
+        @keyframes blink {
+            0%, 50%, 100% { opacity: 1; }
+            25%, 75% { opacity: 0.7; }
+        }
+        
+        .led-label {
+            color: #4a4a4a;
+            font-size: 10px;
+            font-weight: bold;
+            margin-left: 8px;
+            letter-spacing: 1px;
+        }
+        
+        /* 控制按钮区 */
+        .controls {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 20px;
+        }
+        
+        /* 方向键 */
+        .dpad {
+            width: 100px;
+            height: 100px;
+            position: relative;
+        }
+        
+        .dpad-btn {
+            position: absolute;
+            width: 32px;
+            height: 32px;
+            background: #2a2a2a;
+            border-radius: 50%;
+            cursor: pointer;
+            box-shadow: 0 3px 6px rgba(0,0,0,0.3);
+            transition: all 0.1s;
+        }
+        
+        .dpad-btn:active {
+            transform: translateY(2px);
+            box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+        }
+        
+        .dpad-up { top: 0; left: 34px; }
+        .dpad-down { bottom: 0; left: 34px; }
+        .dpad-left { left: 0; top: 34px; }
+        .dpad-right { right: 0; top: 34px; }
+        
+        /* AB按钮 */
+        .ab-buttons {
+            display: flex;
+            gap: 15px;
+            transform: rotate(-25deg);
+            margin-top: 20px;
+        }
+        
+        .action-btn {
+            width: 50px;
+            height: 50px;
+            background: #8b0000;
+            border-radius: 50%;
+            cursor: pointer;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.4);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #4a4a4a;
+            font-weight: bold;
+            font-size: 18px;
+            transition: all 0.1s;
+        }
+        
+        .action-btn:active {
+            transform: translateY(2px);
+            box-shadow: 0 2px 4px rgba(0,0,0,0.4);
+        }
+        
+        .btn-label {
+            font-size: 14px;
+            color: #4a4a4a;
+            font-weight: bold;
+            margin-top: 5px;
+            text-align: center;
+        }
+        
+        /* Start/Select按钮 */
+        .menu-buttons {
+            display: flex;
+            justify-content: center;
+            gap: 30px;
+            margin-top: 30px;
+            transform: rotate(-25deg);
+        }
+        
+        .menu-btn {
+            width: 50px;
+            height: 15px;
+            background: #6a6a6a;
+            border-radius: 10px;
+            cursor: pointer;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+        }
+        
+        .menu-btn:active {
+            transform: translateY(1px);
+        }
+        
+        .menu-label {
+            font-size: 10px;
+            color: #4a4a4a;
+            font-weight: bold;
+            text-align: center;
+            margin-top: 5px;
+            letter-spacing: 1px;
+        }
+        
+        /* 底部扬声器孔 */
+        .speaker {
+            position: absolute;
+            bottom: 30px;
+            right: 40px;
+            display: grid;
+            grid-template-columns: repeat(6, 1fr);
+            gap: 5px;
+            transform: rotate(-25deg);
+        }
+        
+        .speaker-hole {
+            width: 8px;
+            height: 8px;
+            background: #6a6a6a;
+            border-radius: 50%;
+            box-shadow: inset 0 1px 2px rgba(0,0,0,0.5);
+        }
+        
+        /* 游戏提示 */
+        .game-tip {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0,0,0,0.8);
+            color: white;
+            padding: 10px 20px;
+            border-radius: 20px;
+            font-size: 14px;
+        }
+    </style>
+</head>
+<body>
+    <div class="gameboy">
+        <!-- 品牌 -->
+        <div class="gameboy-brand">
+            <div class="gameboy-logo">GAME BOY</div>
+            <div class="gameboy-model">OPENCLAW MMO EDITION</div>
+        </div>
+        
+        <!-- 屏幕 -->
+        <div class="screen-container">
+            <div class="screen-bezel">
+                <canvas id="game-screen"></canvas>
+            </div>
+            <div class="power-led">
+                <div class="led-light"></div>
+                <div class="led-label">POWER</div>
+            </div>
+        </div>
+        
+        <!-- 控制器 -->
+        <div class="controls">
+            <!-- 方向键 -->
+            <div class="dpad">
+                <div class="dpad-btn dpad-up" id="btn-up"></div>
+                <div class="dpad-btn dpad-down" id="btn-down"></div>
+                <div class="dpad-btn dpad-left" id="btn-left"></div>
+                <div class="dpad-btn dpad-right" id="btn-right"></div>
+            </div>
+            
+            <!-- AB按钮 -->
+            <div>
+                <div class="ab-buttons">
+                    <div>
+                        <div class="action-btn" id="btn-b">B</div>
+                        <div class="btn-label">B</div>
+                    </div>
+                    <div>
+                        <div class="action-btn" id="btn-a">A</div>
+                        <div class="btn-label">A</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Start/Select -->
+        <div class="menu-buttons">
+            <div>
+                <div class="menu-btn" id="btn-select"></div>
+                <div class="menu-label">SELECT</div>
+            </div>
+            <div>
+                <div class="menu-btn" id="btn-start"></div>
+                <div class="menu-label">START</div>
+            </div>
+        </div>
+        
+        <!-- 扬声器 -->
+        <div class="speaker">
+            <div class="speaker-hole"></div>
+            <div class="speaker-hole"></div>
+            <div class="speaker-hole"></div>
+            <div class="speaker-hole"></div>
+            <div class="speaker-hole"></div>
+            <div class="speaker-hole"></div>
+            <div class="speaker-hole"></div>
+            <div class="speaker-hole"></div>
+            <div class="speaker-hole"></div>
+            <div class="speaker-hole"></div>
+            <div class="speaker-hole"></div>
+            <div class="speaker-hole"></div>
+            <div class="speaker-hole"></div>
+            <div class="speaker-hole"></div>
+            <div class="speaker-hole"></div>
+            <div class="speaker-hole"></div>
+            <div class="speaker-hole"></div>
+            <div class="speaker-hole"></div>
+        </div>
+    </div>
+    
+    <div class="game-tip">
+        🎮 Keyboard: Arrow Keys + Z(A) / X(B) / Enter(Start) | Click buttons to play
+    </div>
+    
+    <script>
+        // ==================== 游戏核心（使用Tuxemon资源）====================
+        const canvas = document.getElementById('game-screen');
+        const ctx = canvas.getContext('2d');
+        
+        // Game Boy配色
+        const GB_COLORS = {
+            darkest: '#0f380f',
+            dark: '#306230',
+            light: '#8bac0f',
+            lightest: '#9bbc0f'
+        };
+        
+        // 游戏状态
+        const game = {
+            state: 'title', // title, world, battle, dialog
+            player: {
+                x: 5, y: 5,
+                direction: 'down',
+                monsters: [],
+                items: []
+            },
+            currentMap: 'start',
+            loadedImages: {},
+            frameCount: 0
+        };
+        
+        // Tuxemon怪物数据
+        const MONSTERS = {
+            flambear: { name: 'Flambear', type: 'fire', hp: 70, atk: 70, def: 40, spd: 50, sprite: 'flambear' },
+            dollfin: { name: 'Dollfin', type: 'water', hp: 75, atk: 55, def: 45, spd: 55, sprite: 'dollfin' },
+            budaye: { name: 'Budaye', type: 'grass', hp: 78, atk: 50, def: 50, spd: 45, sprite: 'budaye' },
+            aardart: { name: 'Aardart', type: 'normal', hp: 80, atk: 60, def: 50, spd: 40, sprite: 'aardart' }
+        };
+        
+        // 地图数据
+        const MAPS = {
+            start: {
+                width: 10,
+                height: 9,
+                tiles: [
+                    [1,1,1,1,1,1,1,1,1,1],
+                    [1,0,0,0,2,2,0,0,0,1],
+                    [1,0,0,0,2,2,0,0,0,1],
+                    [1,0,0,0,0,0,0,0,0,1],
+                    [1,0,0,0,3,0,0,0,0,1],
+                    [1,0,0,0,0,0,0,0,0,1],
+                    [1,0,0,0,0,0,0,0,0,1],
+                    [1,0,0,0,0,0,0,0,0,1],
+                    [1,1,1,1,1,1,1,1,1,1]
+                ],
+                npcs: [{ id: 'prof', x: 4, y: 4, name: 'Prof.Oak' }],
+                encounters: [{ x: 3, y: 1, w: 2, h: 2, monsters: ['dollfin', 'budaye'] }]
+            }
+        };
+        
+        // 加载Tuxemon资源
+        function loadResources() {
+            const basePath = 'http://localhost:8000/api/sprite/';
+            const monsters = ['flambear', 'dollfin', 'budaye', 'aardart'];
+            
+            monsters.forEach(slug => {
+                const img = new Image();
+                img.src = `${basePath}${slug}/frame/1`;
+                img.onload = () => {
+                    game.loadedImages[slug] = img;
+                    console.log(`✅ Loaded: ${slug}`);
+                };
+                img.onerror = () => {
+                    console.log(`⚠️ Failed to load: ${slug}, using fallback`);
+                };
+            });
+        }
+        
+        // 渲染标题画面
+        function renderTitle() {
+            ctx.fillStyle = GB_COLORS.lightest;
+            ctx.fillRect(0, 0, 320, 288);
+            
+            // 标题
+            ctx.fillStyle = GB_COLORS.darkest;
+            ctx.font = '24px monospace';
+            ctx.textAlign = 'center';
+            ctx.fillText('OPENCLAW MMO', 160, 80);
+            
+            ctx.font = '16px monospace';
+            ctx.fillText('TUXEMON WEB', 160, 110);
+            
+            // 闪烁提示
+            if (Math.floor(game.frameCount / 30) % 2 === 0) {
+                ctx.font = '14px monospace';
+                ctx.fillText('PRESS START', 160, 180);
+            }
+            
+            // 版权信息
+            ctx.font = '10px monospace';
+            ctx.fillText('Based on Tuxemon', 160, 250);
+            ctx.fillText('Open Source Project', 160, 270);
+        }
+        
+        // 渲染世界地图
+        function renderWorld() {
+            ctx.fillStyle = GB_COLORS.lightest;
+            ctx.fillRect(0, 0, 320, 288);
+            
+            const map = MAPS[game.currentMap];
+            const tileSize = 32;
+            
+            // 渲染地图
+            for (let y = 0; y < map.height; y++) {
+                for (let x = 0; x < map.width; x++) {
+                    const tile = map.tiles[y][x];
+                    const px = x * tileSize;
+                    const py = y * tileSize;
+                    
+                    if (tile === 1) {
+                        // 墙壁
+                        ctx.fillStyle = GB_COLORS.darkest;
+                        ctx.fillRect(px, py, tileSize, tileSize);
+                    } else if (tile === 2) {
+                        // 草丛
+                        ctx.fillStyle = GB_COLORS.light;
+                        ctx.fillRect(px, py, tileSize, tileSize);
+                        ctx.fillStyle = GB_COLORS.dark;
+                        ctx.fillRect(px + 4, py + 4, 8, 8);
+                        ctx.fillRect(px + 20, py + 4, 8, 8);
+                        ctx.fillRect(px + 12, py + 20, 8, 8);
+                    } else if (tile === 3) {
+                        // NPC
+                        ctx.fillStyle = GB_COLORS.lightest;
+                        ctx.fillRect(px, py, tileSize, tileSize);
+                        ctx.fillStyle = GB_COLORS.darkest;
+                        ctx.fillRect(px + 8, py + 8, 16, 16);
+                    } else {
+                        // 地面
+                        ctx.fillStyle = GB_COLORS.lightest;
+                        ctx.fillRect(px, py, tileSize, tileSize);
+                        ctx.strokeStyle = GB_COLORS.light;
+                        ctx.strokeRect(px, py, tileSize, tileSize);
+                    }
+                }
+            }
+            
+            // 渲染玩家
+            const px = game.player.x * tileSize;
+            const py = game.player.y * tileSize;
+            ctx.fillStyle = GB_COLORS.darkest;
+            ctx.fillRect(px + 8, py + 8, 16, 16);
+            ctx.fillStyle = GB_COLORS.dark;
+            ctx.fillRect(px + 10, py + 10, 12, 12);
+            
+            // 玩家方向指示
+            const dirOffsets = {
+                up: { x: 14, y: 8 },
+                down: { x: 14, y: 18 },
+                left: { x: 8, y: 14 },
+                right: { x: 18, y: 14 }
+            };
+            const offset = dirOffsets[game.player.direction];
+            ctx.fillStyle = GB_COLORS.light;
+            ctx.fillRect(px + offset.x, py + offset.y, 4, 4);
+        }
+        
+        // 主循环
+        function gameLoop() {
+            game.frameCount++;
+            
+            switch (game.state) {
+                case 'title':
+                    renderTitle();
+                    break;
+                case 'world':
+                    renderWorld();
+                    break;
+                case 'battle':
+                    renderBattle();
+                    break;
+            }
+            
+            requestAnimationFrame(gameLoop);
+        }
+        
+        // 初始化
+        loadResources();
+        gameLoop();
+        
+        // 键盘控制
+        document.addEventListener('keydown', (e) => {
+            const key = e.key;
+            
+            if (game.state === 'title') {
+                if (key === 'Enter') {
+                    game.state = 'world';
+                }
+                return;
+            }
+            
+            if (game.state === 'world') {
+                let moved = false;
+                let newX = game.player.x;
+                let newY = game.player.y;
+                
+                if (key === 'ArrowUp' || key === 'w') {
+                    newY--;
+                    game.player.direction = 'up';
+                    moved = true;
+                }
+                if (key === 'ArrowDown' || key === 's') {
+                    newY++;
+                    game.player.direction = 'down';
+                    moved = true;
+                }
+                if (key === 'ArrowLeft' || key === 'a') {
+                    newX--;
+                    game.player.direction = 'left';
+                    moved = true;
+                }
+                if (key === 'ArrowRight' || key === 'd') {
+                    newX++;
+                    game.player.direction = 'right';
+                    moved = true;
+                }
+                
+                // 碰撞检测
+                const map = MAPS[game.currentMap];
+                if (newX >= 0 && newX < map.width && newY >= 0 && newY < map.height) {
+                    if (map.tiles[newY][newX] !== 1) {
+                        game.player.x = newX;
+                        game.player.y = newY;
+                        
+                        // 草丛遭遇
+                        if (map.tiles[newY][newX] === 2 && Math.random() < 0.05) {
+                            startBattle();
+                        }
+                    }
+                }
+                
+                // NPC交互
+                if (key === 'z' || key === 'Z' || key === ' ') {
+                    const npc = map.npcs.find(n => 
+                        Math.abs(n.x - game.player.x) <= 1 && 
+                        Math.abs(n.y - game.player.y) <= 1
+                    );
+                    
+                    if (npc) {
+                        interactNPC(npc);
+                    }
+                }
+            }
+        });
+        
+        // 按钮控制
+        document.getElementById('btn-up').addEventListener('click', () => {
+            document.dispatchEvent(new KeyboardEvent('keydown', {key: 'ArrowUp'}));
+        });
+        document.getElementById('btn-down').addEventListener('click', () => {
+            document.dispatchEvent(new KeyboardEvent('keydown', {key: 'ArrowDown'}));
+        });
+        document.getElementById('btn-left').addEventListener('click', () => {
+            document.dispatchEvent(new KeyboardEvent('keydown', {key: 'ArrowLeft'}));
+        });
+        document.getElementById('btn-right').addEventListener('click', () => {
+            document.dispatchEvent(new KeyboardEvent('keydown', {key: 'ArrowRight'}));
+        });
+        document.getElementById('btn-a').addEventListener('click', () => {
+            document.dispatchEvent(new KeyboardEvent('keydown', {key: 'z'}));
+        });
+        document.getElementById('btn-start').addEventListener('click', () => {
+            document.dispatchEvent(new KeyboardEvent('keydown', {key: 'Enter'}));
+        });
+        
+        function interactNPC(npc) {
+            if (npc.id === 'prof' && game.player.monsters.length === 0) {
+                // 给予初始怪物
+                const starter = {
+                    ...MONSTERS.flambear,
+                    level: 5,
+                    currentHp: 70,
+                    maxHp: 70
+                };
+                game.player.monsters.push(starter);
+                console.log('✅ Received Flambear!');
+            }
+        }
+        
+        function startBattle() {
+            game.state = 'battle';
+            // 简化的战斗逻辑
+            console.log('⚔️ Battle started!');
+        }
+        
+        function renderBattle() {
+            ctx.fillStyle = GB_COLORS.lightest;
+            ctx.fillRect(0, 0, 320, 288);
+            
+            ctx.fillStyle = GB_COLORS.darkest;
+            ctx.font = '16px monospace';
+            ctx.textAlign = 'center';
+            ctx.fillText('BATTLE!', 160, 140);
+            ctx.font = '12px monospace';
+            ctx.fillText('Press B to exit', 160, 180);
+        }
+        
+        console.log('🎮 OpenClaw MMO - Tuxemon Web (Game Boy Edition)');
+        console.log('📦 Loading Tuxemon resources...');
+    </script>
+</body>
+</html>

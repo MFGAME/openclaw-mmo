@@ -1,0 +1,160 @@
+[
+  {
+    "slug": "tackle",
+    "name": "撞击",
+    "types": ["normal"],
+    "category": "physical",
+    "power": 40,
+    "accuracy": 100,
+    "pp": 35,
+    "target": "enemy",
+    "description": "用全身撞击对手"
+  },
+  {
+    "slug": "ember",
+    "name": "火花",
+    "types": ["fire"],
+    "category": "special",
+    "power": 40,
+    "accuracy": 100,
+    "pp": 25,
+    "target": "enemy",
+    "description": "喷射火焰攻击对手"
+  },
+  {
+    "slug": "water_gun",
+    "name": "水枪",
+    "types": ["water"],
+    "category": "special",
+    "power": 40,
+    "accuracy": 100,
+    "pp": 25,
+    "target": "enemy",
+    "description": "喷水攻击对手"
+  },
+  {
+    "slug": "vine_whip",
+    "name": "藤鞭",
+    "types": ["grass"],
+    "category": "physical",
+    "power": 45,
+    "accuracy": 100,
+    "pp": 25,
+    "target": "enemy",
+    "description": "用藤鞭抽打对手"
+  },
+  {
+    "slug": "thunder_shock",
+    "name": "电击",
+    "types": ["electric"],
+    "category": "special",
+    "power": 40,
+    "accuracy": 100,
+    "pp": 30,
+    "target": "enemy",
+    "effects": ["paralyze:10"],
+    "description": "电击对手，有10%几率麻痹"
+  },
+  {
+    "slug": "scratch",
+    "name": "抓",
+    "types": ["normal"],
+    "category": "physical",
+    "power": 40,
+    "accuracy": 100,
+    "pp": 35,
+    "target": "enemy",
+    "description": "用爪子抓对手"
+  },
+  {
+    "slug": "fire_fang",
+    "name": "火焰牙",
+    "types": ["fire"],
+    "category": "physical",
+    "power": 65,
+    "accuracy": 95,
+    "pp": 15,
+    "target": "enemy",
+    "effects": ["burn:10"],
+    "description": "用燃烧的牙齿咬对手，有10%几率灼烧"
+  },
+  {
+    "slug": "ice_fang",
+    "name": "冰冻牙",
+    "types": ["ice"],
+    "category": "physical",
+    "power": 65,
+    "accuracy": 95,
+    "pp": 15,
+    "target": "enemy",
+    "effects": ["freeze:10"],
+    "description": "用冰冷的牙齿咬对手，有10%几率冰冻"
+  },
+  {
+    "slug": "poison_sting",
+    "name": "毒针",
+    "types": ["poison"],
+    "category": "physical",
+    "power": 15,
+    "accuracy": 100,
+    "pp": 35,
+    "target": "enemy",
+    "effects": ["poison:30"],
+    "description": "用毒针刺对手，有30%几率中毒"
+  },
+  {
+    "slug": "wing_attack",
+    "name": "翅膀攻击",
+    "types": ["flying"],
+    "category": "physical",
+    "power": 60,
+    "accuracy": 100,
+    "pp": 35,
+    "target": "enemy",
+    "description": "用翅膀拍打对手"
+  },
+  {
+    "slug": "rock_throw",
+    "name": "落石",
+    "types": ["rock"],
+    "category": "physical",
+    "power": 50,
+    "accuracy": 90,
+    "pp": 15,
+    "target": "enemy",
+    "description": "扔石头攻击对手"
+  },
+  {
+    "slug": "karate_chop",
+    "name": "手刀",
+    "types": ["fighting"],
+    "category": "physical",
+    "power": 50,
+    "accuracy": 100,
+    "pp": 25,
+    "target": "enemy",
+    "description": "用手刀劈砍对手"
+  },
+  {
+    "slug": "bite",
+    "name": "咬",
+    "types": ["dark"],
+    "category": "physical",
+    "power": 60,
+    "accuracy": 100,
+    "pp": 25,
+    "target": "enemy",
+    "description": "用利齿咬对手"
+  },
+  {
+    "slug": "struggle",
+    "name": "挣扎",
+    "types": ["normal"],
+    "category": "physical",
+    "power": 50,
+    "accuracy": 100,
+    "pp": 999,
+    "target": "enemy",
+    "description": "拼命挣扎攻击"
+  }
+]

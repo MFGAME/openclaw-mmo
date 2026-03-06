@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tuxemon Web - Complete Port</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        
+        body {
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-family: monospace;
+        }
+        
+        .gba {
+            width: 900px;
+            height: 900px;
+            background: linear-gradient(145deg, #7a2d8c, #5a1d6c);
+            border-radius: 30px;
+            padding: 40px 50px 50px 50px;
+            box-shadow: 0 30px 80px rgba(0,0,0,0.6);
+            position: relative;
+        }
+        
+        .gba-brand {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        
+        .gba-logo {
+            font-size: 32px;
+            font-weight: bold;
+            color: #fff;
+        }
+        
+        .gba-subtitle {
+            font-size: 12px;
+            color: #e0b0ff;
+            margin-top: 5px;
+        }
+        
+        .screen-container {
+            background: #1a1a2e;
+            padding: 15px;
+            border-radius: 10px;
+            margin-bottom: 30px;
+        }
+        
+        #game-screen {
+            width: 720px;
+            height: 480px;
+            background: #000;
+            display: block;
+            image-rendering: pixelated;
+        }
+        
+        .controls {
+            width: 100%;
+            display: flex;
+            justify-content: space-between;
+            padding: 0 20px;
+        }
+        
+        .dpad-container {
+            position: relative;
+            width: 150px;
+            height: 150px;
+        }
+        
+        .dpad-btn {
+            position: absolute;
+            width: 50px;
+            height: 50px;
+            background: #2a2a3e;
+            border-radius: 50%;
+            cursor: pointer;
+        }
+        
+        .dpad-up { left: 50px; top: 0; }
+        .dpad-down { left: 50px; top: 100px; }
+        .dpad-left { left: 0; top: 50px; }
+        .dpad-right { left: 100px; top: 50px; }
+        
+        .action-buttons {
+            position: relative;
+            width: 180px;
+            height: 180px;
+        }
+        
+        .action-btn {
+            position: absolute;
+            width: 70px;
+            height: 70px;
+            border-radius: 50%;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            font-size: 20px;
+            color: #fff;
+        }
+        
+        .btn-a {
+            background: #e74c3c;
+            right: 20px;
+            top: 20px;
+        }
+        
+        .btn-b {
+            background: #e67e22;
+            right: 90px;
+            top: 90px;
+        }
+        
+        .btn-l {
+            background: #3498db;
+            left: 0;
+            top: -30px;
+            width: 60px;
+            height: 40px;
+            border-radius: 20px;
+            font-size: 16px;
+        }
+        
+        .btn-r {
+            background: #3498db;
+            right: 0;
+            top: -30px;
+            width: 60px;
+            height: 40px;
+            border-radius: 20px;
+            font-size: 16px;
+        }
+        
+        .menu-buttons {
+            display: flex;
+            justify-content: center;
+            gap: 30px;
+            margin-top: 30px;
+        }
+        
+        .menu-btn {
+            width: 60px;
+            height: 15px;
+            background: #4a4a5e;
+            border-radius: 10px;
+            cursor: pointer;
+        }
+        
+        .tip {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0,0,0,0.8);
+            color: white;
+            padding: 15px 30px;
+            border-radius: 25px;
+            font-size: 14px;
+        }
+    </style>
+</head>
+<body>
+    <div class="gba">
+        <div class="gba-brand">
+            <div class="gba-logo">TUXEMON WEB</div>
+            <div class="gba-subtitle">COMPLETE PORT FROM OPEN SOURCE</div>
+        </div>
+        
+        <div class="screen-container">
+            <canvas id="game-screen"></canvas>
+        </div>
+        
+        <div class="controls">
+            <div class="dpad-container">
+                <div class="dpad-btn dpad-up" id="btn-up"></div>
+                <div class="dpad-btn dpad-down" id="btn-down"></div>
+                <div class="dpad-btn dpad-left" id="btn-left"></div>
+                <div class="dpad-btn dpad-right" id="btn-right"></div>
+            </div>
+            
+            <div class="menu-buttons">
+                <div>
+                    <div class="menu-btn" id="btn-select"></div>
+                    <div style="font-size:10px;color:#e0b0ff;text-align:center;margin-top:5px;">SELECT</div>
+                </div>
+                <div>
+                    <div class="menu-btn" id="btn-start"></div>
+                    <div style="font-size:10px;color:#e0b0ff;text-align:center;margin-top:5px;">START</div>
+                </div>
+            </div>
+            
+            <div class="action-buttons">
+                <div class="action-btn btn-l" id="btn-l">L</div>
+                <div class="action-btn btn-r" id="btn-r">R</div>
+                <div class="action-btn btn-a" id="btn-a">A</div>
+                <div class="action-btn btn-b" id="btn-b">B</div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="tip">
+        🎮 Tuxemon 1:1 Port | Arrows/WASD: Move | Z/A: Confirm | X/B: Back | Enter/Start: Menu
+    </div>
+    
+    <script src="tuxemon_complete.js"></script>
+</body>
+</html>
