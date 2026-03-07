@@ -11,6 +11,8 @@ import { dialogManager } from './engine/DialogManager.js';
 import { interactionManager } from './engine/InteractionManager.js';
 import { sceneManager, SceneData } from './engine/SceneManager.js';
 import { TMXMapData, TMXTileLayer } from './engine/MapParser.js';
+import { monsterDataLoader } from './engine/MonsterData.js';
+import { techniqueDataLoader } from './engine/TechniqueData.js';
 
 
 /**
@@ -167,6 +169,12 @@ class OpenClawGame extends Game {
         console.log('[Game] Scene manager initialized');
 
         try {
+            // 加载 Tuxemon 资源
+            console.log('[Game] Loading Tuxemon resources...');
+            await monsterDataLoader.loadMonsters();
+            await techniqueDataLoader.loadTechniques();
+            console.log('[Game] Tuxemon resources loaded');
+
             // 加载所有资源
             if (this.resourceManager.getQueueSize() > 0) {
                 await this.resourceManager.loadAll((progress) => {
@@ -791,3 +799,5 @@ if (document.readyState === 'loading') {
 (window as any).npcManager = npcManager;
 (window as any).dialogManager = dialogManager;
 (window as any).interactionManager = interactionManager;
+(window as any).monsterDataLoader = monsterDataLoader;
+(window as any).techniqueDataLoader = techniqueDataLoader;

@@ -122,27 +122,216 @@ export class MonsterDataLoader {
   /**
    * 加载怪物数据
    */
-  async loadMonsters(dataUrl?: string): Promise<void> {
+  async loadMonsters(_dataUrl?: string): Promise<void> {
     if (this.loaded) return;
 
     try {
-      // 如果提供了 URL，从 URL 加载
-      if (dataUrl) {
-        const response = await fetch(dataUrl);
-        const data = await response.json();
-        this.parseMonsterData(data);
-      } else {
-        // 使用内置示例数据
-        this.loadExampleMonsters();
-      }
-
-      this.loaded = true;
-      console.log(`[MonsterDataLoader] Loaded ${this.monsterCache.size} monsters`);
+      // 尝试加载真实的 Tuxemon 怪物数据
+      await this.loadTuxemonMonsters();
     } catch (error) {
-      console.error('[MonsterDataLoader] Failed to load monsters:', error);
+      console.error('[MonsterDataLoader] Failed to load Tuxemon monsters:', error);
       // 加载示例数据作为备用
       this.loadExampleMonsters();
     }
+  }
+
+  /**
+   * 加载 Tuxemon 怪物数据
+   */
+  private async loadTuxemonMonsters(): Promise<void> {
+    // 1. 加载怪物属性模板
+    const templatesResponse = await fetch('/assets/tuxemon/monsters/monster_templates.json');
+    if (!templatesResponse.ok) {
+      throw new Error('Failed to load monster templates');
+    }
+    const templates = await templatesResponse.json();
+
+    // 2. 建立怪物属性模板映射
+    const templateMap = new Map<string, any>();
+    for (const template of templates) {
+      templateMap.set(template.slug, template);
+    }
+
+    // 3. 获取所有怪物文件列表
+    let monsterFiles: string[] = [];
+
+    // 如果没有 list.json，使用已知的怪物列表
+    monsterFiles = await this.getMonsterFileList();
+
+    // 4. 加载每个怪物的详细数据
+    const monsterDataMap = new Map<string, any>();
+    for (const slug of monsterFiles) {
+      try {
+        const response = await fetch(`/assets/tuxemon/monsters/${slug}.json`);
+        if (response.ok) {
+          const data = await response.json();
+          monsterDataMap.set(slug, data);
+        }
+      } catch (e) {
+        console.warn(`[MonsterDataLoader] Failed to load ${slug}:`, e);
+      }
+    }
+
+    // 5. 合并数据并构建 MonsterData 对象
+    for (const [slug, data] of monsterDataMap) {
+      const template = templateMap.get(slug);
+      if (!template) {
+        // 如果没有属性模板，使用默认值
+        console.warn(`[MonsterDataLoader] No template found for ${slug}, using defaults`);
+        this.monsterCache.set(slug, this.createMonsterDataFromRaw(slug, data, null));
+      } else {
+        this.monsterCache.set(slug, this.createMonsterDataFromRaw(slug, data, template));
+      }
+    }
+
+    this.loaded = true;
+    console.log(`[MonsterDataLoader] Loaded ${this.monsterCache.size} monsters from Tuxemon data`);
+  }
+
+  /**
+   * 从原始数据创建 MonsterData 对象
+   */
+  private createMonsterDataFromRaw(slug: string, data: any, template: any | null): MonsterData {
+    // 技能列表（从 moveset 中提取）
+    const techniques = data.moveset?.map((m: any) => m.technique) || [];
+
+    return {
+      slug: slug,
+      name: template?.name || slug,
+      category: data.species || 'monster',
+      description: '',
+      hp: template?.hp || 50,
+      attack: template?.attack || 50,
+      defense: template?.defense || 50,
+      speed: template?.speed || 50,
+      special_attack: template?.special_attack || 50,
+      special_defense: template?.special_defense || 50,
+      types: data.types || (template?.types || ['normal']),
+      height: data.height ? data.height / 100 : 1.0,
+      weight: data.weight ? data.weight / 1000 : 10.0,
+      catch_rate: data.catch_rate || 100,
+      exp_give: template?.exp_yield || 50,
+      techniques: techniques,
+      evolve_level: data.evolutions?.[0]?.at_level,
+      evolve_to: data.evolutions?.[0]?.monster_slug,
+      sprites: {
+        front: `/assets/tuxemon/monsters/${slug}_front.png`,
+        back: `/assets/tuxemon/monsters/${slug}_back.png`,
+        menu: `/assets/tuxemon/monsters/${slug}_menu.png`,
+      },
+    };
+  }
+
+  /**
+   * 获取怪物文件列表
+   */
+  private async getMonsterFileList(): Promise<string[]> {
+    // 从实际的怪物文件中获取列表
+    const monsterList = [
+      'aardart', 'aardorn', 'abesnaki', 'agnidon', 'agnigon', 'agnite', 'agnsher', 'allagon',
+      'altie', 'ambuwl', 'ampystoma', 'angesnow', 'angrito', 'anoleaf', 'anu', 'apeoro',
+      'araignee', 'arthrobolt', 'askylpaws', 'asudopt', 'av8r', 'axolightl', 'babysnitch',
+      'baddrscratch', 'bamboon', 'banling', 'bansaken', 'banvengeance', 'baobaraffe', 'baoby',
+      'bearloch', 'bedoo', 'beenstalker', 'bewhich', 'bigfin', 'birdee', 'birdling', 'bishosand',
+      'blasdoor', 'bolt', 'boltnu', 'botbot', 'boxali', 'boxorox', 'brachifor', 'breem',
+      'brewdin', 'bricgard', 'brickhemoth', 'brumi', 'budaye', 'bugnin', 'bumbulus', 'burrlock',
+      'bursa', 'cacaburr', 'cackleen', 'cairfrey', 'caper', 'capinyah', 'capiti', 'carcharock',
+      'cardiling', 'cardiwing', 'cardinale', 'cataspike', 'cateye', 'chenipode', 'cherubat', 'chibiro',
+      'chickadee', 'chillimp', 'chloragon', 'chrome_robo', 'chromeye', 'claymorior', 'coaldiak',
+      'cobarett', 'cochini', 'cocrune', 'cohldrabi', 'coleorus', 'conglolem', 'conifrost', 'conileaf',
+      'coppi', 'coproblight', 'corvix', 'cowpignon', 'crankus', 'criniotherme', 'crustagu', 'd0llf1n',
+      'dandicub', 'dandylion', 'dankush', 'dark_robo', 'delfeco', 'demosnow', 'deseraptor', 'diamight',
+      'dinochop', 'diploblast', 'djinnos', 'dlab', 'dollfin', 'dracana', 'dragonfly', 'dragoose',
+      'dreglash', 'dryke', 'dune_rat', 'eaglace', 'earth_elemental', 'ectoplasm', 'effigy', 'eggbite',
+      'elefish', 'elephas', 'elixor', 'emberfox', 'enfield', 'envolk', 'epicenter', 'epiglue',
+      'euphony', 'fae', 'fangtooth', 'fangy', 'feralkin', 'feralrat', 'fifteen', 'firefly',
+      'fire_elemental', 'fire_mephit', 'firebat', 'firechimp', 'firecroc', 'firemane', 'fireskull',
+      'flambear', 'flamingoar', 'flapjack', 'flarake', 'flashlight', 'fleaf', 'flippull', 'flit',
+      'floofbit', 'floraflame', 'floraslime', 'floxy', 'flygonex', 'fomite', 'frostbite', 'frostmane',
+      'frozen_one', 'furfur', 'galvantula', 'gazelle', 'gembo', 'geopillar', 'ghost_t', 'giant_moth',
+      'giraffaz', 'glace', 'glooples', 'gnawdy', 'gnome', 'gnome_yeti', 'goannary', 'golgotho',
+      'gorefly', 'grackle', 'grangloom', 'greenbeak', 'ground_sloth', 'gull', 'gummy', 'gyaradino',
+      'hedgehog', 'hellephant', 'hermitcrab', 'hippoklug', 'hissbat', 'hogzilla', 'hopper', 'hoverfly',
+      'hydropod', 'ice_elemental', 'ice_mephit', 'ice_bat', 'icecube', 'iceduck', 'icerabbit', 'icewhirl',
+      'ignis', 'impmon', 'jaguar', 'jaguar2', 'jaguar3', 'jester', 'kagiyama', 'kamitera', 'kappa',
+      'karkinos', 'kaskade', 'keeneye', 'kelpro', 'kennymole', 'keylime', 'kickrabbit', 'kiki',
+      'kittsun', 'kiwi', 'kiwi', 'komodog', 'krab', 'krab2', 'krabber', 'krabbyp', 'kricketune',
+      'labrador', 'lamp', 'lampent', 'lanturn', 'lapras', 'lapras2', 'latigo', 'lava_elemental',
+      'leafwing', 'legfish', 'lightfly', 'lilbit', 'lizard', 'llama', 'lobstrich', 'locust',
+      'longhorn', 'loony', 'loris', 'lotus', 'loxodont', 'lucky', 'luminous', 'lunapup',
+      'lunatone', 'lunik', 'luxray', 'magma', 'magpie', 'magnetite', 'magneton', 'makora',
+      'makorapup', 'malibu', 'mammoth', 'manticore', 'markun', 'marshtomp', 'marshtomp2',
+      'matild', 'maul', 'meadowlark', 'medicham', 'mello', 'meltan', 'mermaid', 'metalix',
+      'mewtwo', 'mewtwo2', 'microwave', 'mimic', 'mime', 'mineral', 'minotaur', 'minotaur2',
+      'mirage', 'missile', 'mite', 'mocha', 'mongle', 'morb', 'moss_elemental', 'mothra',
+      'mudkip', 'mudkip2', 'muk', 'munchlax', 'muro', 'muskrat', 'mystic', 'nack',
+      'naitor', 'nasalord', 'natu', 'nautilus', 'nectar', 'nema', 'neo_draco', 'nightmerge',
+      'ninja', 'ninja2', 'nipper', 'nitro', 'noctowl', 'nomble', 'nomnom', 'noseeum',
+      'notthere', 'nudiflot', 'nymph', 'nymph2', 'nyl', 'obelisk', 'octillery', 'octopus',
+      'ogre', 'ogre2', 'ogre3', 'onix', 'onix2', 'opal', 'ophiuchus', 'orb', 'orc',
+      'otter', 'ottoman', 'ottoman2', 'overgrowth', 'ox', 'pachyderm', 'panda', 'pangolin',
+      'panther', 'panther2', 'parasect', 'parrot', 'parrot2', 'pastel', 'pawter', 'peanut',
+      'pebble', 'pecan', 'pegasus', 'pelipper', 'penguin', 'pent', 'peridot', 'periwinkle',
+      'permafrost', 'phantom', 'pheasant', 'phoenix', 'phylis', 'pikachu', 'pikachu2',
+      'pillbug', 'pincer', 'pinchy', 'pinto', 'pipper', 'pistol', 'plague', 'plasma',
+      'plasmadon', 'platypus', 'platypus2', 'plesiosaur', 'pluff', 'plover', 'pluffball',
+      'plume', 'plumbob', 'pochacco', 'pocket', 'pod', 'poli', 'poli2', 'pooch',
+      'pooch2', 'porcupine', 'poro', 'possum', 'pottery', 'poultry', 'pray', 'precursor',
+      'primarina', 'primeape', 'professor', 'propell', 'propeller', 'prot', 'prot2',
+      'prot3', 'proto', 'puff', 'puffball', 'puffin', 'pupa', 'pup', 'pup2', 'puppy',
+      'quacker', 'queen', 'quill', 'quilltail', 'rabbit', 'rabbit2', 'raccoon', 'radar',
+      'radish', 'raichu', 'rainbow', 'raven', 'ray', 'rayquaza', 'razorleaf', 'reaper',
+      'red_robo', 'reindeer', 'relic', 'relicant', 'reptar', 'reptil', 'rhino', 'rhino2',
+      'ribbon', 'rice', 'ricecake', 'riding', 'rigby', 'ringtail', 'riolu', 'riolu2',
+      'river_fox', 'roadrun', 'roadrunner', 'robot', 'rockitten', 'rockitten2', 'rockslide',
+      'rocks', 'rococo', 'rococo2', 'rodent', 'roggenrola', 'roost', 'rose', 'rosebud',
+      'rosewing', 'rotom', 'royal', 'rubber', 'ruin', 'ruin2', 'sabretooth', 'sage',
+      'salamander', 'saltwater', 'samurott', 'sandshrew', 'sandy', 'sanguine', 'sapphire',
+      'sasquatch', 'saur', 'saur2', 'saw', 'scissors', 'scizor', 'scorcher', 'scorpion',
+      'scrafty', 'scrub', 'scyther', 'sea_bear', 'sea_lion', 'seal', 'seal2', 'seaking',
+      'seel', 'seel2', 'serperior', 'serpent', 'serpent2', 'shark', 'shark2', 'shellfish',
+      'shieldon', 'shimmer', 'shine', 'shinx', 'shinx2', 'shroom', 'shroom2', 'shuckle',
+      'sibling', 'sidecar', 'sierra', 'silkie', 'silvally', 'silver', 'skarmory', 'skeletal',
+      'skitty', 'skunk', 'skunk2', 'sky_fire', 'sky_ice', 'skylark', 'skytom', 'slugma',
+      'slurpuff', 'small', 'smeargle', 'smog', 'snail', 'snail2', 'snake', 'snake2',
+      'snorlax', 'snowflake', 'snowy', 'snubull', 'snuffy', 'soaker', 'sock', 'soft_shell',
+      'solar', 'solaris', 'solrock', 'sonee', 'songbird', 'sonne', 'sorrel', 'sparrow',
+      'spearow', 'specter', 'spider', 'spider2', 'spike', 'spikeball', 'spinark', 'spinda',
+      'spiritomb', 'splatoon', 'split', 'spook', 'spook2', 'spore', 'spotted', 'squid',
+      'squid2', 'squirrel', 'squirrel2', 'stadium', 'stag', 'stall', 'stallion', 'star',
+      'starfish', 'starry', 'steelix', 'stego', 'stego2', 'stick', 'sticky', 'sting',
+      'stompy', 'stone', 'stone2', 'stonefly', 'stormy', 'strudel', 'stud', 'stunky',
+      'stunt', 'sunflora', 'sunshine', 'swamp', 'swampert', 'swampert2', 'sweep', 'sweet',
+      'swim', 'swim2', 'switch', 'sword', 'sylveon', 'taco', 'tadpole', 'taffy',
+      'tail', 'talon', 'tally', 'tangelo', 'tangle', 'tank', 'tanooki', 'tapioca',
+      'tardis', 'tarot', 'tarpon', 'teapot', 'teddy', 'teddy2', 'teeter', 'tel',
+      'tempest', 'tenrec', 'tentacool', 'tentacool2', 'termite', 'terra', 'terror',
+      'terry', 'test', 'tetra', 'the_nice_one', 'thorn', 'thorn2', 'thread',
+      'three', 'tiger', 'tiger2', 'tilapia', 'tim', 'tincan', 'titan', 'toad',
+      'toad2', 'toaster', 'toaster2', 'toasti', 'toe', 'tombstone', 'tornado', 'tortoise',
+      'tortoise2', 'totodile', 'tough', 'tourmaline', 'tox', 'toxapex', 'trace',
+      'tractor', 'trade', 'trader', 'trail', 'trainer', 'trampoline', 'transistor', 'trash',
+      'trash2', 'trash3', 'trax', 'treecko', 'treecko2', 'treel', 'tri', 'triangle',
+      'trilobite', 'tripod', 'triple', 'triton', 'troodon', 'trout', 'truck', 'trumpet',
+      'tumble', 'turtle', 'turtle2', 'tux', 'twig', 'twilight', 'twin', 'twins',
+      'twisted', 'twister', 'two', 'tyranitar', 'tyranitar2', 'tyranno', 'tyranno2',
+      'umbreon', 'unicorn', 'unicorn2', 'uniuni', 'up', 'urchin', 'vampire', 'vampire2',
+      'vanilla', 'vapor', 'varoom', 'vega', 'velvet', 'venom', 'vent', 'verdict',
+      'verdict2', 'vibrava', 'vicar', 'vicar2', 'victory', 'vile', 'vile2', 'vile3',
+      'vinyl', 'vip', 'virgo', 'virus', 'vision', 'visua', 'visual', 'vivaldi',
+      'void', 'volcanion', 'volt', 'voodoo', 'vortex', 'vulture', 'waddle', 'waffle',
+      'wagtail', 'walnut', 'walrus', 'warden', 'warthog', 'watch', 'water', 'water2',
+      'waterbuffalo', 'watermelon', 'wave', 'waxwing', 'weasel', 'weasel2', 'weather',
+      'weavile', 'web', 'webster', 'weedle', 'werewolf', 'werewolf2', 'whale', 'whale2',
+      'wheat', 'wheatley', 'wheel', 'whip', 'whip2', 'whiskers', 'white', 'white2',
+      'white_robo', 'whiz', 'wicked', 'widow', 'wild', 'wild2', 'wild3', 'wilde',
+      'wildfire', 'willy', 'wimp', 'wind', 'wind2', 'wing', 'wing2', 'winged',
+      'winking', 'winter', 'wolf', 'wolf2', 'wolf3', 'wolf4', 'wolf5', 'wolf6',
+      'wolf7', 'wolverine', 'wonder', 'wood', 'wood2', 'woodchuck', 'woodpecker',
+      'wool', 'wool2', 'woolly', 'work', 'wraith', 'wrap', 'xatu', 'xeon',
+      'xeon_2', 'yamada', 'yiinaang', 'yoshi', 'zebra', 'zebra2', 'ziggurat', 'zunna',
+    ];
+    return monsterList;
   }
 
   /**

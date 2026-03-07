@@ -142,27 +142,110 @@ export class TechniqueDataLoader {
   /**
    * 加载技能数据
    */
-  async loadTechniques(dataUrl?: string): Promise<void> {
+  async loadTechniques(_dataUrl?: string): Promise<void> {
     if (this.loaded) return;
 
     try {
-      // 如果提供了 URL，从 URL 加载
-      if (dataUrl) {
-        const response = await fetch(dataUrl);
-        const data = await response.json();
-        this.parseTechniqueData(data);
-      } else {
-        // 使用内置示例数据
-        this.loadExampleTechniques();
-      }
-
-      this.loaded = true;
-      console.log(`[TechniqueDataLoader] Loaded ${this.techniqueCache.size} techniques`);
+      // 尝试加载真实的技能数据
+      await this.loadTuxemonTechniques();
     } catch (error) {
       console.error('[TechniqueDataLoader] Failed to load techniques:', error);
       // 加载示例数据作为备用
       this.loadExampleTechniques();
     }
+  }
+
+  /**
+   * 加载 Tuxemon 技能数据
+   */
+  private async loadTuxemonTechniques(): Promise<void> {
+    // 加载技能模板
+    const response = await fetch('/assets/tuxemon/techniques/skill_templates.json');
+    if (!response.ok) {
+      throw new Error('Failed to load skill templates');
+    }
+
+    const skills = await response.json();
+
+    // 解析技能数据
+    for (const skill of skills) {
+      this.techniqueCache.set(skill.slug, this.createTechniqueDataFromRaw(skill));
+    }
+
+    this.loaded = true;
+    console.log(`[TechniqueDataLoader] Loaded ${this.techniqueCache.size} techniques from Tuxemon data`);
+  }
+
+  /**
+   * 从原始技能数据创建 TechniqueData 对象
+   */
+  private createTechniqueDataFromRaw(skill: any): TechniqueData {
+    // 解析效果
+    const effects: TechniqueEffect[] = [];
+
+    if (skill.power && skill.power > 0) {
+      effects.push({ type: 'damage' });
+    }
+
+    // 解析状态效果
+    if (skill.effects) {
+      for (const effect of skill.effects) {
+        if (typeof effect === 'string') {
+          const [statusId, chanceStr] = effect.split(':');
+          if (statusId && chanceStr) {
+            effects.push({
+              type: 'status_apply',
+              statusId: statusId,
+              chance: parseInt(chanceStr, 10)
+            });
+          }
+        }
+      }
+    }
+
+    // 确定分类
+    let category: TechniqueCategory;
+    switch (skill.category) {
+      case 'physical':
+        category = TechniqueCategory.PHYSICAL;
+        break;
+      case 'special':
+        category = TechniqueCategory.SPECIAL;
+        break;
+      case 'status':
+        category = TechniqueCategory.STATUS;
+        break;
+      default:
+        category = TechniqueCategory.PHYSICAL;
+    }
+
+    // 确定范围和目标
+    let range: TechniqueRange = TechniqueRange.SINGLE;
+    let target: TechniqueTarget = TechniqueTarget.ENEMY;
+
+    if (skill.target === 'self') {
+      target = TechniqueTarget.ALLY;
+      range = TechniqueRange.SELF;
+    } else if (skill.target === 'all') {
+      target = TechniqueTarget.BOTH;
+      range = TechniqueRange.ALL;
+    }
+
+    return {
+      slug: skill.slug,
+      name: skill.name,
+      description: skill.description || '',
+      category: category,
+      element: skill.types?.[0] || 'normal',
+      power: skill.power || 0,
+      accuracy: skill.accuracy || 100,
+      pp: skill.pp || 10,
+      priority: 0,
+      range: range,
+      target: target,
+      effects: effects,
+      tech_id: Math.random() * 1000, // 临时 ID
+    };
   }
 
   /**

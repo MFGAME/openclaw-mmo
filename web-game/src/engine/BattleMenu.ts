@@ -98,19 +98,16 @@ export class BattleMenu {
   private itemItems: MenuItem[] = [];
 
   /** 目标列表 */
-  private _targetItems: MenuItem[] = [];
 
   /** 回调函数 */
   private callback: MenuCallback | null = null;
 
   /** 是否已初始化 */
-  private _initialized: boolean = false;
 
   /**
    * 初始化菜单
    */
   initialize(): void {
-    this.initialized = true;
     this.state = MenuState.MAIN;
     this.currentItems = this.mainMenuItems;
     this.selectedIndex = 0;
@@ -273,7 +270,6 @@ export class BattleMenu {
    */
   showTargetMenu(targets: MenuItem[]): void {
     this.state = MenuState.TARGET;
-    this.targetItems = targets;
     this.currentItems = targets;
     this.selectedIndex = 0;
   }
