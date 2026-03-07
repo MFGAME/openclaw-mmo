@@ -1,0 +1,37 @@
+{
+  "appid": "your_lark_app_id",
+  "appName": "OpenClaw MMO",
+  "versionName": "0.1.0",
+  "versionCode": 1,
+  "description": "OpenClaw MMO - 网页版宝可梦游戏",
+  "pages": {
+    "index": {
+      "path": "index.html",
+      "style": {
+        "navigationStyle": "custom"
+      }
+    }
+  },
+  "window": {
+    "navigationBarTitleText": "OpenClaw MMO",
+    "navigationBarBackgroundColor": "#16213e",
+    "navigationBarTextStyle": "white",
+    "backgroundColor": "#16213e",
+    "backgroundTextStyle": "light"
+  },
+  "permission": {
+    "scope.writePhotosAlbum": {
+      "desc": "保存游戏截图"
+    }
+  },
+  "networkTimeout": {
+    "request": 10000,
+    "uploadFile": 30000,
+    "downloadFile": 60000
+  },
+  "debug": false,
+  "compatible": {
+    "ignoreVersion": false,
+    "minPlatformVersion": "1.0.0"
+  }
+}
