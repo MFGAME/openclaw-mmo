@@ -1,0 +1,82 @@
+# OpenClaw MMO - Docker 忽略文件
+#
+# 排除不需要复制到 Docker 镜像的文件和目录
+
+# Node 依赖
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# TypeScript 编译输出
+dist/
+*.tsbuildinfo
+
+# 编辑器配置
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Git
+.git/
+.gitignore
+.gitattributes
+
+# 测试和覆盖率
+coverage/
+.nyc_output/
+*.test.ts
+*.spec.ts
+__tests__/
+jest.config.js
+
+# 文档
+README.md
+CHANGELOG.md
+LICENSE
+docs/
+
+# CI/CD
+.github/
+.gitlab-ci.yml
+.travis.yml
+
+# 环境配置
+.env
+.env.local
+.env.*.local
+
+# 日志
+logs/
+*.log
+
+# 临时文件
+tmp/
+temp/
+*.tmp
+
+# 操作系统文件
+Thumbs.db
+desktop.ini
+
+# Docker 相关
+Dockerfile*
+docker-compose*.yml
+.dockerignore
+
+# 部署相关
+deploy.sh
+*.sh
+
+# IDE 插件
+.vscode/
+.idea/
+*.sublime-*
+*.sublime-workspace
+
+# 其他
+.cache/
+.eslintcache
