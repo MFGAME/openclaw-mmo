@@ -79,7 +79,8 @@ export interface NPC {
   y: number;
   /** 瓦片宽度 */
   tileWidth: number;
-  /** 瓦片高度: number;
+  /** 瓦片高度 */
+  tileHeight: number;
   /** 朝向 */
   direction: Direction;
   /** 行为类型 */
@@ -148,12 +149,6 @@ export class NPCManager {
   /** 当前停留时间映射 */
   private currentWaitTime: Map<string, number> = new Map();
 
-  /** 瓦片宽度 */
-  private tileWidth = 32;
-
-  /** 瓦片高度 */
-  private tileHeight = 32;
-
   /** 玩家控制器引用 */
   private playerController: PlayerController | null = null;
 
@@ -181,28 +176,18 @@ export class NPCManager {
   /**
    * 初始化 NPC 管理器
    * @param playerController 玩家控制器
-   * @param tileWidth 瓦片宽度
-   * @param tileHeight 瓦片高度
+   * @param _tileWidth 瓦片宽度（已废弃，由 NPC 自身属性控制）
+   * @param _tileHeight 瓦片高度（已废弃，由 NPC 自身属性控制）
    */
-  initialize(playerController: PlayerController, tileWidth = 32, tileHeight = 32): void {
+  initialize(playerController: PlayerController, _tileWidth = 32, _tileHeight = 32): void {
     if (this.initialized) {
       console.warn('[NPCManager] 已经初始化');
       return;
     }
 
     this.playerController = playerController;
-    this.tileWidth = tileWidth;
-    this.tileHeight = tileHeight;
     this.initialized = true;
     console.log('[NPCManager] NPC 管理器已初始化');
-  }
-
-  /**
-   * 设置瓦片尺寸
-   */
-  setTileSize(tileWidth: number, tileHeight: number): void {
-    this.tileWidth = tileWidth;
-    this.tileHeight = tileHeight;
   }
 
   /**
@@ -449,7 +434,6 @@ export class NPCManager {
    */
   private handleWander(npc: NPC, currentTime: number): void {
     const nextTime = this.nextWanderTime.get(npc.id) || 0;
-    const waitTime = this.currentWaitTime.get(npc.id) || 0;
 
     // 检查是否需要开始移动
     if (currentTime >= nextTime) {

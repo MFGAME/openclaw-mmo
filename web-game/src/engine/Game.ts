@@ -153,7 +153,7 @@ export class Game {
      * 更新回调（子类重写）
      * @param deltaTime 距离上一帧的时间（毫秒）
      */
-    protected onUpdate(deltaTime: number): void {
+    protected onUpdate(_deltaTime: number): void {
         // 子类实现
     }
 
@@ -161,7 +161,7 @@ export class Game {
      * 渲染回调（子类重写）
      * @param ctx Canvas 2D 上下文
      */
-    protected onRender(ctx: CanvasRenderingContext2D): void {
+    protected onRender(_ctx: CanvasRenderingContext2D): void {
         // 子类实现
     }
 

@@ -33,6 +33,7 @@ export enum KeyCode {
   SPACE = ' ',
   ENTER = 'Enter',
   ESCAPE = 'Escape',
+  F1 = 'F1',
 
   // 其他
   TAB = 'Tab',
@@ -199,8 +200,10 @@ export class InputManager {
   /**
    * 处理触摸开始事件
    */
-  private handleTouchStart(event: TouchEvent): void {
-    for (const touch of event.changedTouches) {
+  private handleTouchStart(event: Event): void {
+    const touchEvent = event as TouchEvent;
+    for (let i = 0; i < touchEvent.changedTouches.length; i++) {
+      const touch = touchEvent.changedTouches[i];
       this.touches.set(touch.identifier, {
         x: touch.clientX,
         y: touch.clientY,
@@ -209,8 +212,8 @@ export class InputManager {
     }
 
     // 单点触摸，记录为滑动的起点
-    if (event.touches.length === 1) {
-      const touch = event.touches[0];
+    if (touchEvent.touches.length === 1) {
+      const touch = touchEvent.touches[0];
       this.swipeData.startX = touch.clientX;
       this.swipeData.startY = touch.clientY;
       this.swipeData.direction = SwipeDirection.NONE;
@@ -220,8 +223,10 @@ export class InputManager {
   /**
    * 处理触摸移动事件
    */
-  private handleTouchMove(event: TouchEvent): void {
-    for (const touch of event.changedTouches) {
+  private handleTouchMove(event: Event): void {
+    const touchEvent = event as TouchEvent;
+    for (let i = 0; i < touchEvent.changedTouches.length; i++) {
+      const touch = touchEvent.changedTouches[i];
       this.touches.set(touch.identifier, {
         x: touch.clientX,
         y: touch.clientY,
@@ -233,13 +238,15 @@ export class InputManager {
   /**
    * 处理触摸结束事件
    */
-  private handleTouchEnd(event: TouchEvent): void {
-    for (const touch of event.changedTouches) {
+  private handleTouchEnd(event: Event): void {
+    const touchEvent = event as TouchEvent;
+    for (let i = 0; i < touchEvent.changedTouches.length; i++) {
+      const touch = touchEvent.changedTouches[i];
       this.touches.delete(touch.identifier);
     }
 
     // 检测滑动
-    if (event.touches.length === 0) {
+    if (touchEvent.touches.length === 0) {
       this.detectSwipe();
     }
   }

@@ -162,8 +162,6 @@ export class PlayerController {
   private initialized = false;
 
   /** 当前按下的触摸位置 */
-  private touchStartX: number = 0;
-  private touchStartY: number = 0;
 
   /**
    * 私有构造函数，确保单例
