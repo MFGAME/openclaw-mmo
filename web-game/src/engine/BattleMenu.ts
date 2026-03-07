@@ -1,6 +1,6 @@
 /**
  * 战斗菜单 - 管理战斗中的行动选择菜单
- * 
+ *
  * 功能：
  * - 显示主菜单（战斗、技能、道具、逃跑）
  * - 显示技能选择菜单
@@ -9,6 +9,7 @@
  */
 
 import { inputManager, KeyCode } from './InputManager';
+import { techniqueDataLoader, TechniqueData } from './TechniqueData';
 
 /**
  * 菜单动作类型
@@ -93,6 +94,9 @@ export class BattleMenu {
 
   /** 技能菜单项 */
   private techniqueItems: MenuItem[] = [];
+
+  /** 技能数据缓存（用于显示详情） */
+  private techniqueDataCache: Map<string, TechniqueData> = new Map();
 
   /** 道具菜单项 */
   private itemItems: MenuItem[] = [];
@@ -275,16 +279,27 @@ export class BattleMenu {
   }
 
   /**
-   * 设置技能列表
+   * 设置技能列表（使用 TechniqueDataLoader 加载技能数据）
    */
   setTechniques(techniques: { id: string; name: string; currentPp: number; maxPp: number }[]): void {
-    this.techniqueItems = techniques.map(tech => ({
-      id: tech.id,
-      text: `${tech.name} (${tech.currentPp}/${tech.maxPp})`,
-      enabled: tech.currentPp > 0,
-      action: MenuAction.TECHNIQUE,
-      data: tech.id,
-    }));
+    this.techniqueDataCache.clear();
+    this.techniqueItems = [];
+
+    for (const tech of techniques) {
+      // 从 TechniqueDataLoader 获取技能数据
+      const techniqueData = techniqueDataLoader.getTechnique(tech.id);
+      if (techniqueData) {
+        this.techniqueDataCache.set(tech.id, techniqueData);
+      }
+
+      this.techniqueItems.push({
+        id: tech.id,
+        text: `${tech.name} (${tech.currentPp}/${tech.maxPp})`,
+        enabled: tech.currentPp > 0,
+        action: MenuAction.TECHNIQUE,
+        data: tech.id,
+      });
+    }
 
     // 添加返回选项
     this.techniqueItems.push({
@@ -400,6 +415,21 @@ export class BattleMenu {
       // 文本
       ctx.fillStyle = item.enabled ? '#ffffff' : '#6b7280';
       ctx.fillText(item.text, menuX + 40, y + 10);
+
+      // 如果在技能菜单，显示技能详情
+      if (this.state === MenuState.TECHNIQUE && item.data && typeof item.data === 'string') {
+        const technique = this.techniqueDataCache.get(item.data);
+        if (technique) {
+          ctx.fillStyle = '#a0a0a0';
+          ctx.font = '11px Arial';
+          ctx.fillText(
+            `威力:${technique.power} 命中:${technique.accuracy}%`,
+            menuX + 40,
+            y + 22
+          );
+          ctx.font = '14px Arial';
+        }
+      }
     }
 
     ctx.restore();

@@ -1,10 +1,10 @@
 /**
  * 战斗 UI 管理器 - 管理战斗界面渲染和交互
- * 
+ *
  * 功能：
  * - 渲染战斗场景（背景、怪物显示）
  * - 渲染战斗菜单
- * - 显示战斗信息（HP、状态等）
+ * - 显示战斗信息（HP、状态、属性等）
  * - 处理战斗事件
  */
 
@@ -145,6 +145,9 @@ export class BattleUI {
     // 渲染 HP 条
     this.renderHpBars(ctx, state, height);
 
+    // 渲染怪物属性（HP、攻击、防御、速度）
+    this.renderMonsterStatsDisplay(ctx, state, width, height);
+
     // 渲染战斗菜单
     this.battleMenu.render(ctx, width, height);
 
@@ -154,6 +157,28 @@ export class BattleUI {
     // 渲染战斗结束画面
     if (state.phase === BattlePhase.BATTLE_END) {
       this.renderBattleEnd(ctx, width, height, state.result);
+    }
+  }
+
+  /**
+   * 渲染怪物属性显示
+   */
+  private renderMonsterStatsDisplay(
+    ctx: CanvasRenderingContext2D,
+    state: BattleState,
+    width: number,
+    height: number
+  ): void {
+    // 玩家怪物属性（显示在左下角）
+    const playerMonster = state.playerParty.find(m => !m.isFainted);
+    if (playerMonster) {
+      this.renderMonsterStats(ctx, 30, height - 120, playerMonster);
+    }
+
+    // 敌方怪物属性（显示在左上角）
+    const enemyMonster = state.enemyParty.find(m => !m.isFainted);
+    if (enemyMonster) {
+      this.renderMonsterStats(ctx, width - 160, 60, enemyMonster);
     }
   }
 
@@ -323,6 +348,51 @@ export class BattleUI {
     ctx.fillText(`${unit.name} Lv.${unit.level}`, x, y - 5);
     ctx.textAlign = 'right';
     ctx.fillText(`${unit.currentHp}/${unit.maxHp}`, x + width, y - 5);
+
+    ctx.restore();
+  }
+
+  /**
+   * 渲染怪物属性信息（HP、攻击、防御、速度）
+   */
+  private renderMonsterStats(
+    ctx: CanvasRenderingContext2D,
+    x: number,
+    y: number,
+    unit: BattleUnit
+  ): void {
+    ctx.save();
+
+    const boxWidth = 120;
+    const boxHeight = 80;
+
+    // 背景框
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+    ctx.fillRect(x, y, boxWidth, boxHeight);
+    ctx.strokeStyle = '#ffffff';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(x, y, boxWidth, boxHeight);
+
+    // 属性文字
+    ctx.fillStyle = '#ffffff';
+    ctx.font = '11px Arial';
+    ctx.textAlign = 'left';
+
+    const lineHeight = 16;
+    const startY = y + 12;
+
+    // HP
+    ctx.fillStyle = '#ef4444';
+    ctx.fillText(`HP: ${unit.maxHp}`, x + 8, startY);
+    // 攻击
+    ctx.fillStyle = '#f97316';
+    ctx.fillText(`攻: ${unit.attack}`, x + 8, startY + lineHeight);
+    // 防御
+    ctx.fillStyle = '#eab308';
+    ctx.fillText(`防: ${unit.defense}`, x + 8, startY + lineHeight * 2);
+    // 速度
+    ctx.fillStyle = '#22c55e';
+    ctx.fillText(`速: ${unit.speed}`, x + 8, startY + lineHeight * 3);
 
     ctx.restore();
   }
