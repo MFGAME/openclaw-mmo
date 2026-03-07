@@ -28,6 +28,8 @@ export enum PlayerState {
   DIALOGUE = 'dialogue',
   /** 交互中 */
   INTERACTING = 'interacting',
+  /** 跳跃中 */
+  JUMPING = 'jumping',
 }
 
 /**
@@ -42,6 +44,8 @@ export interface PlayerPosition {
   x: number;
   /** 平滑 Y 坐标（像素） */
   y: number;
+  /** 跳跃高度偏移（像素） */
+  jumpOffset: number;
 }
 
 /**
@@ -70,6 +74,10 @@ export interface PlayerConfig {
     centerY: number;
     radius: number;
   };
+  /** 跳跃高度（像素） */
+  jumpHeight: number;
+  /** 跳跃持续时间（毫秒） */
+  jumpDuration: number;
 }
 
 /**
@@ -80,10 +88,23 @@ export interface MoveEvent {
   direction: Direction;
   /** 起始瓦片坐标 */
   fromX: number;
+  /** 起始瓦片坐标 */
   fromY: number;
   /** 目标瓦片坐标 */
   toX: number;
+  /** 目标瓦片坐标 */
   toY: number;
+}
+
+/**
+ * 跳跃事件接口
+ */
+export interface JumpEvent {
+  /** 起始位置 */
+  fromX: number;
+  fromY: number;
+  /** 跳跃高度 */
+  height: number;
 }
 
 /**
@@ -95,6 +116,16 @@ export type MoveCompleteCallback = (event: MoveEvent) => void;
  * 移动被阻挡的回调函数
  */
 export type MoveBlockedCallback = (event: MoveEvent) => void;
+
+/**
+ * 跳跃开始的回调函数
+ */
+export type JumpStartCallback = (event: JumpEvent) => void;
+
+/**
+ * 跳跃完成的回调函数
+ */
+export type JumpCompleteCallback = (event: JumpEvent) => void;
 
 /**
  * 玩家控制器
@@ -110,6 +141,7 @@ export class PlayerController {
     tileY: 0,
     x: 0,
     y: 0,
+    jumpOffset: 0,
   };
 
   /** 玩家朝向 */
@@ -120,6 +152,16 @@ export class PlayerController {
 
   /** 是否在跑步 */
   private running: boolean = false;
+
+  /** 是否在跳跃 */
+  private jumping: boolean = false;
+
+  /** 跳跃进度（0-1） */
+  private jumpProgress: number = 0;
+
+  /** 跳跃起始位置 */
+  private jumpStartX: number = 0;
+  private jumpStartY: number = 0;
 
   /** 基础移动速度（用于跑步计算） */
   private baseMoveSpeed: number = 200;
@@ -134,6 +176,8 @@ export class PlayerController {
     collisionRadius: 12,
     keyRepeatDelay: 200,
     keyRepeatInterval: 100,
+    jumpHeight: 32,
+    jumpDuration: 400,
   };
 
   /** 目标位置（用于平滑动画） */
@@ -164,6 +208,12 @@ export class PlayerController {
 
   /** 移动被阻挡回调列表 */
   private moveBlockedCallbacks: MoveBlockedCallback[] = [];
+
+  /** 跳跃开始回调列表 */
+  private jumpStartCallbacks: JumpStartCallback[] = [];
+
+  /** 跳跃完成回调列表 */
+  private jumpCompleteCallbacks: JumpCompleteCallback[] = [];
 
   /** 是否已初始化 */
   private initialized = false;
@@ -243,12 +293,22 @@ export class PlayerController {
       return;
     }
 
-    // 处理移动动画
-    if (this.state === PlayerState.MOVING) {
-      this.updateMoveAnimation(deltaTime);
+    // 处理跳跃动画（跳跃时不能移动）
+    if (this.state === PlayerState.JUMPING) {
+      this.updateJumpAnimation(deltaTime);
     } else {
-      // 处理输入
-      this.handleInput();
+      // 检测 Space 键（跳跃）
+      if (inputManager.isPressed(KeyCode.SPACE)) {
+        this.startJump();
+      } else {
+        // 处理移动动画
+        if (this.state === PlayerState.MOVING) {
+          this.updateMoveAnimation(deltaTime);
+        } else {
+          // 处理输入
+          this.handleInput();
+        }
+      }
     }
   }
 
@@ -325,6 +385,58 @@ export class PlayerController {
 
     if (direction) {
       this.tryMove(direction);
+    }
+  }
+
+  /**
+   * 开始跳跃
+   */
+  private startJump(): void {
+    if (this.jumping) return;
+
+    this.jumping = true;
+    this.jumpProgress = 0;
+    this.state = PlayerState.JUMPING;
+    this.jumpStartX = this.position.x;
+    this.jumpStartY = this.position.y;
+
+    // 触发跳跃开始回调
+    this.triggerJumpStart({
+      fromX: this.position.tileX,
+      fromY: this.position.tileY,
+      height: this.config.jumpHeight,
+    });
+
+    console.log('[PlayerController] Jump started');
+  }
+
+  /**
+   * 更新跳跃动画
+   */
+  private updateJumpAnimation(deltaTime: number): void {
+    // 更新跳跃进度
+    this.jumpProgress += deltaTime / this.config.jumpDuration;
+
+    if (this.jumpProgress >= 1) {
+      // 跳跃完成
+      this.jumpProgress = 1;
+      this.position.jumpOffset = 0;
+      this.state = PlayerState.IDLE;
+      this.jumping = false;
+
+      // 触发跳跃完成回调
+      this.triggerJumpComplete({
+        fromX: this.jumpStartX / this.config.tileWidth,
+        fromY: this.jumpStartY / this.config.tileHeight,
+        height: this.config.jumpHeight,
+      });
+
+      console.log('[PlayerController] Jump completed');
+    } else {
+      // 使用抛物线计算跳跃高度
+      // 抛物线公式: y = 4 * h * x * (1 - x)
+      const jumpHeight = 4 * this.config.jumpHeight * this.jumpProgress * (1 - this.jumpProgress);
+      this.position.jumpOffset = -jumpHeight; // 负值表示向上
     }
   }
 
@@ -538,6 +650,40 @@ export class PlayerController {
   }
 
   /**
+   * 注册跳跃开始回调
+   */
+  onJumpStart(callback: JumpStartCallback): void {
+    this.jumpStartCallbacks.push(callback);
+  }
+
+  /**
+   * 移除跳跃开始回调
+   */
+  offJumpStart(callback: JumpStartCallback): void {
+    const index = this.jumpStartCallbacks.indexOf(callback);
+    if (index !== -1) {
+      this.jumpStartCallbacks.splice(index, 1);
+    }
+  }
+
+  /**
+   * 注册跳跃完成回调
+   */
+  onJumpComplete(callback: JumpCompleteCallback): void {
+    this.jumpCompleteCallbacks.push(callback);
+  }
+
+  /**
+   * 移除跳跃完成回调
+   */
+  offJumpComplete(callback: JumpCompleteCallback): void {
+    const index = this.jumpCompleteCallbacks.indexOf(callback);
+    if (index !== -1) {
+      this.jumpCompleteCallbacks.splice(index, 1);
+    }
+  }
+
+  /**
    * 触发移动完成回调
    */
   private triggerMoveComplete(event: MoveEvent): void {
@@ -556,6 +702,24 @@ export class PlayerController {
   }
 
   /**
+   * 触发跳跃开始回调
+   */
+  private triggerJumpStart(event: JumpEvent): void {
+    for (const callback of this.jumpStartCallbacks) {
+      callback(event);
+    }
+  }
+
+  /**
+   * 触发跳跃完成回调
+   */
+  private triggerJumpComplete(event: JumpEvent): void {
+    for (const callback of this.jumpCompleteCallbacks) {
+      callback(event);
+    }
+  }
+
+  /**
    * 强制移动到指定位置（忽略碰撞）
    */
   teleportTo(tileX: number, tileY: number): void {
@@ -567,6 +731,7 @@ export class PlayerController {
     this.targetY = this.position.y;
     this.moveProgress = 0;
     this.state = PlayerState.IDLE;
+    this.position.jumpOffset = 0;
   }
 
   /**
@@ -616,6 +781,27 @@ export class PlayerController {
   }
 
   /**
+   * 获取跳跃状态
+   */
+  isJumping(): boolean {
+    return this.jumping;
+  }
+
+  /**
+   * 获取跳跃高度偏移（用于渲染）
+   */
+  getJumpOffset(): number {
+    return this.position.jumpOffset;
+  }
+
+  /**
+   * 获取跳跃进度（0-1）
+   */
+  getJumpProgress(): number {
+    return this.jumpProgress;
+  }
+
+  /**
    * 获取基础移动速度
    */
   getBaseMoveSpeed(): number {
@@ -645,6 +831,7 @@ export class PlayerController {
       tileY: 0,
       x: 0,
       y: 0,
+      jumpOffset: 0,
     };
     this.facingDirection = Direction.DOWN;
     this.state = PlayerState.IDLE;
@@ -658,6 +845,10 @@ export class PlayerController {
     this.lastMoveTime = 0;
     this.lastDirectionKey = null;
     this.running = false;
+    this.jumping = false;
+    this.jumpProgress = 0;
+    this.jumpStartX = 0;
+    this.jumpStartY = 0;
   }
 }
 

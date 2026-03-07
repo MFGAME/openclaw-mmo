@@ -132,6 +132,8 @@ class OpenClawGame extends Game {
             collisionRadius: 12,
             keyRepeatDelay: 200,
             keyRepeatInterval: 100,
+            jumpHeight: 32,
+            jumpDuration: 400,
         });
 
         // 设置玩家起始位置（在地图中心附近）
@@ -622,55 +624,83 @@ class OpenClawGame extends Game {
      */
     private renderPlayer(ctx: CanvasRenderingContext2D): void {
         const playerPos = playerController.getPixelPosition();
+        const playerFullPos = playerController.getPosition();
         const direction = playerController.getFacingDirection();
+        const isRunning = playerController.isRunning();
+        const isJumping = playerController.isJumping();
 
         const x = playerPos.x - this.cameraX;
         const y = playerPos.y - this.cameraY;
+        const jumpOffset = playerFullPos.jumpOffset;
 
         // 绘制玩家（简单矩形，实际应该使用精灵图）
         ctx.save();
 
-        // 玩家身体
-        ctx.fillStyle = '#4299e1';
-        ctx.fillRect(x + 4, y + 4, this.tileWidth - 8, this.tileHeight - 8);
+        // 跳跃时的阴影
+        if (isJumping) {
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.2)';
+            ctx.beginPath();
+            ctx.ellipse(x + this.tileWidth / 2, y + this.tileHeight - 2, 12, 6, 0, 0, Math.PI * 2);
+            ctx.fill();
+        }
+
+        // 应用跳跃偏移
+        const renderY = y + jumpOffset;
+
+        // 玩家身体 - 跑步时颜色更深
+        ctx.fillStyle = isRunning ? '#2563eb' : '#4299e1';
+        ctx.fillRect(x + 4, renderY + 4, this.tileWidth - 8, this.tileHeight - 8);
 
         // 绘制方向指示
-        ctx.fillStyle = '#2b6cb0';
+        ctx.fillStyle = isRunning ? '#1d4ed8' : '#2b6cb0';
         switch (direction) {
             case Direction.UP:
                 ctx.beginPath();
-                ctx.moveTo(x + this.tileWidth / 2, y + 4);
-                ctx.lineTo(x + this.tileWidth / 2 - 4, y + 12);
-                ctx.lineTo(x + this.tileWidth / 2 + 4, y + 12);
+                ctx.moveTo(x + this.tileWidth / 2, renderY + 4);
+                ctx.lineTo(x + this.tileWidth / 2 - 4, renderY + 12);
+                ctx.lineTo(x + this.tileWidth / 2 + 4, renderY + 12);
                 ctx.fill();
                 break;
             case Direction.DOWN:
                 ctx.beginPath();
-                ctx.moveTo(x + this.tileWidth / 2, y + this.tileHeight - 4);
-                ctx.lineTo(x + this.tileWidth / 2 - 4, y + this.tileHeight - 12);
-                ctx.lineTo(x + this.tileWidth / 2 + 4, y + this.tileHeight - 12);
+                ctx.moveTo(x + this.tileWidth / 2, renderY + this.tileHeight - 4);
+                ctx.lineTo(x + this.tileWidth / 2 - 4, renderY + this.tileHeight - 12);
+                ctx.lineTo(x + this.tileWidth / 2 + 4, renderY + this.tileHeight - 12);
                 ctx.fill();
                 break;
             case Direction.LEFT:
                 ctx.beginPath();
-                ctx.moveTo(x + 4, y + this.tileHeight / 2);
-                ctx.lineTo(x + 12, y + this.tileHeight / 2 - 4);
-                ctx.lineTo(x + 12, y + this.tileHeight / 2 + 4);
+                ctx.moveTo(x + 4, renderY + this.tileHeight / 2);
+                ctx.lineTo(x + 12, renderY + this.tileHeight / 2 - 4);
+                ctx.lineTo(x + 12, renderY + this.tileHeight / 2 + 4);
                 ctx.fill();
                 break;
             case Direction.RIGHT:
                 ctx.beginPath();
-                ctx.moveTo(x + this.tileWidth - 4, y + this.tileHeight / 2);
-                ctx.lineTo(x + this.tileWidth - 12, y + this.tileHeight / 2 - 4);
-                ctx.lineTo(x + this.tileWidth - 12, y + this.tileHeight / 2 + 4);
+                ctx.moveTo(x + this.tileWidth - 4, renderY + this.tileHeight / 2);
+                ctx.lineTo(x + this.tileWidth - 12, renderY + this.tileHeight / 2 - 4);
+                ctx.lineTo(x + this.tileWidth - 12, renderY + this.tileHeight / 2 + 4);
                 ctx.fill();
                 break;
         }
 
         // 眼睛
         ctx.fillStyle = '#ffffff';
-        ctx.fillRect(x + 10, y + 12, 4, 4);
-        ctx.fillRect(x + 18, y + 12, 4, 4);
+        ctx.fillRect(x + 10, renderY + 12, 4, 4);
+        ctx.fillRect(x + 18, renderY + 12, 4, 4);
+
+        // 跑步时的呼吸/奔跑效果（简单的缩放）
+        if (isRunning) {
+            const breatheScale = 1 + Math.sin(Date.now() / 100) * 0.05;
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.3)';
+            ctx.lineWidth = 2;
+            ctx.strokeRect(
+                x + 4 - (breatheScale - 1) * 8,
+                renderY + 4 - (breatheScale - 1) * 8,
+                this.tileWidth - 8 + (breatheScale - 1) * 16,
+                this.tileHeight - 8 + (breatheScale - 1) * 16
+            );
+        }
 
         ctx.restore();
     }
@@ -778,6 +808,8 @@ class OpenClawGame extends Game {
         ctx.fillText(`Direction: ${direction}`, 20, y); y += lineHeight;
         ctx.fillText(`State: ${playerController.getState()}`, 20, y); y += lineHeight;
         ctx.fillText(`Running: ${playerController.isRunning() ? 'YES' : 'NO'}`, 20, y); y += lineHeight;
+        ctx.fillText(`Jumping: ${playerController.isJumping() ? 'YES' : 'NO'}`, 20, y); y += lineHeight;
+        ctx.fillText(`Jump Offset: ${playerController.getJumpOffset().toFixed(1)}px`, 20, y); y += lineHeight;
         ctx.fillText(`Camera: (${Math.round(this.cameraX)}, ${Math.round(this.cameraY)})`, 20, y); y += lineHeight;
         ctx.fillText(`NPC Count: ${npcManager.getAllNPCs().length}`, 20, y); y += lineHeight;
         ctx.fillText(`Nearby NPCs: ${nearbyNPCs.length}`, 20, y); y += lineHeight;

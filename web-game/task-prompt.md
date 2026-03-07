@@ -1,156 +1,102 @@
-# 开发任务 - Week 3-4 核心功能补充
+# OpenClaw MMO - 开发任务（2026-03-08 06:20）
 
 ## 📋 任务列表
 
-### 任务 1: 动态碰撞管理（CollisionManager 增强）
+### 任务 1: 战斗伤害计算引擎 - P2
 
-**目标**: 实现动态添加/移除碰撞区域
+**目标**: 实现完整的伤害计算公式（对标 Tuxemon 战斗系统）
 
-**具体步骤**:
-1. 在 `CollisionManager.ts` 中添加以下方法：
-   - `addCollision(x: number, y: number, temporary?: boolean, duration?: number): void`
-   - `removeCollision(x: number, y: number): void`
-   - `addCollisionArea(area: CollisionArea): void`
-   - `removeCollisionArea(id: string): void`
+**具体任务**:
+- [ ] 创建 `src/engine/BattleCalculator.ts` 伤害计算引擎
+- [ ] 实现基础伤害公式：`damage = (power * attack / defense) * modifier`
+- [ ] 实现属性克制倍率（14 种元素的克制关系）
+- [ ] 实现暴击系统（暴击率、暴击倍率）
+- [ ] 实现命中率计算
+- [ ] 实现浮动伤害（随机波动 ±15%）
 
-2. 支持临时碰撞：
-   - 带过期时间的碰撞（如技能效果区域）
-   - 使用 `setTimeout` 或游戏循环检查
-
-3. 支持碰撞区域：
-   - 矩形区域（RectCollisionArea）
-   - 圆形区域（CircleCollisionArea）
-
-4. 更新碰撞检测逻辑：
-   - `isCollision(x, y)` 需要检查动态碰撞
-   - NPC 和玩家移动时需要考虑动态碰撞
+**参考**: Tuxemon 的 `combat.py` 伤害计算逻辑
 
 **验收标准**:
-- 可以动态添加/移除碰撞
-- 临时碰撞能自动过期
-- 不影响现有碰撞系统
+- 伤害计算结果与 Tuxemon 原版一致
+- 属性克制正确生效
+- 暴击和命中正确计算
 
 ---
 
-### 任务 2: 事件系统（EventManager）
+### 任务 2: 状态效果系统（Status Effects）- P2
 
-**目标**: 实现地图事件触发器和条件判断
+**目标**: 实现战斗中的状态效果系统（中毒、灼烧、麻痹等）
 
-**具体步骤**:
-1. 创建 `src/engine/EventManager.ts`
+**具体任务**:
+- [ ] 创建 `src/engine/StatusEffectManager.ts` 状态效果管理器
+- [ ] 定义状态类型枚举（中毒、灼烧、麻痹、冰冻、睡眠等 35 种）
+- [ ] 实现状态效果数据结构
+- [ ] 实现状态效果触发逻辑（回合开始/结束触发）
+- [ ] 实现状态持续回合管理
+- [ ] 实现状态清除逻辑
 
-2. 定义接口：
-```typescript
-interface GameEvent {
-  id: string;
-  type: 'step_on' | 'interact' | 'auto';
-  trigger: { x: number; y: number; width?: number; height?: number };
-  conditions: EventCondition[];
-  actions: EventAction[];
-  once?: boolean;
-  triggered?: boolean;
-}
-
-interface EventCondition {
-  type: 'has_item' | 'flag_set' | 'npc_defeated' | 'level_above';
-  params: Record<string, any>;
-}
-
-interface EventAction {
-  type: 'teleport' | 'dialogue' | 'give_item' | 'set_flag' | 'start_battle';
-  params: Record<string, any>;
-}
-```
-
-3. 实现核心方法：
-   - `checkEvents(x, y, type)` - 检查事件触发
-   - `evaluateConditions(conditions)` - 评估条件
-   - `executeActions(actions)` - 执行动作
-   - `triggerEvent(eventId)` - 触发特定事件
-
-4. 集成到 Game.ts：
-   - 在游戏循环中检查 `step_on` 事件
-   - 在交互时检查 `interact` 事件
-   - 场景加载时检查 `auto` 事件
+**参考**: Tuxemon 的 `status.py` 状态系统
 
 **验收标准**:
-- 踩踏触发器能正常工作
-- 条件判断能正确执行
-- 动作能正确触发（传送、对话等）
+- 状态效果正确触发
+- 持续回合正确递减
+- 状态数据加载正确
 
 ---
 
-### 任务 3: 场景切换系统（SceneManager）
+### 任务 3: 战斗回合制流程控制 - P2
 
-**目标**: 实现传送门和进出建筑
+**目标**: 实现完整的回合制战斗流程（选择→执行→结算）
 
-**具体步骤**:
-1. 创建 `src/engine/SceneManager.ts`
+**具体任务**:
+- [ ] 创建 `src/engine/BattleFlowController.ts` 战斗流程控制器
+- [ ] 实现回合阶段枚举（选择、执行、结算、结束）
+- [ ] 实现速度排序逻辑（决定行动顺序）
+- [ ] 实现技能选择阶段（玩家/AI）
+- [ ] 实现技能执行阶段（动画 + 伤害计算）
+- [ ] 实现回合结算阶段（状态伤害、回合结束效果）
+- [ ] 实现战斗结束判定（一方全倒）
 
-2. 定义场景数据结构：
-```typescript
-interface SceneData {
-  id: string;
-  name: string;
-  mapPath: string;
-  npcs: NPC[];
-  events: GameEvent[];
-  spawnPoints: Record<string, { x: number; y: number }>;
-  isIndoor?: boolean;
-}
-```
-
-3. 实现核心方法：
-   - `loadScene(sceneId: string, spawnPoint?: string)` - 加载场景
-   - `changeScene(sceneId: string, spawnPoint?: string)` - 切换场景
-   - `getCurrentScene()` - 获取当前场景
-   - `saveSceneState()` - 保存场景状态
-   - `restoreSceneState(sceneId)` - 恢复场景状态
-
-4. 实现传送门：
-   - 在 TMX 地图中定义传送门对象
-   - 解析传送门属性（目标场景、出生点）
-   - 玩家踩踏时触发场景切换
-
-5. 实现场景切换动画：
-   - 淡出当前场景
-   - 加载新场景
-   - 淡入新场景
-   - 播放音效（可选）
+**参考**: Tuxemon 的战斗流程控制
 
 **验收标准**:
-- 传送门能正常工作
-- 进出建筑能正常切换
-- 场景切换有动画过渡
-- NPC 和事件状态正确保持
+- 回合流程正确执行
+- 速度排序正确
+- 战斗结束判定准确
 
 ---
 
-## 🎯 完成后预期
+## 🎨 资源使用规范
 
-- Week 3-4 进度: 85% → **95%**
-- 总体进度: ~25% → **~30%**
-- 核心功能基本完成
+**⚠️ 必须遵守**:
+
+1. **阅读 `TUXEMON_RESOURCES.md`** - 了解资源使用规范
+2. **所有资源必须使用 Tuxemon 原版资源**
+3. **禁止使用占位符**
+4. **禁止自制素材**
+5. **代码需要详细的中文注释**
 
 ---
 
-## ⚠️ 重要要求
+## 🔧 技术要求
 
-1. **阅读 TUXEMON_RESOURCES.md** - 了解资源使用规范
-2. **使用 Tuxemon 原版资源** - 禁止占位符
-3. **详细中文注释** - 代码可读性
-4. **完整功能实现** - 不偷工减料
-5. **遇到编译错误必须修复** - 不能停止
-6. **必须确保 npm run build 编译通过** - 验收标准
-7. **测试验收** - 确保功能正常
+1. **TypeScript** - 类型安全
+2. **详细中文注释** - 代码可读性
+3. **完整功能实现** - 不偷工减料
+4. **遇到编译错误必须修复** - 不能停止
+5. **必须确保 `npm run build` 编译通过** - 验收标准
 
 ---
 
 ## 📝 完成通知
 
 完成后运行：
+
 ```bash
-C:\Users\Administrator\AppData\Roaming\npm\openclaw.cmd system event --text "Done: [任务摘要]" --mode now
+C:\Users\Administrator\AppData\Roaming\npm\openclaw.cmd system event --text "Done: 战斗伤害计算引擎、状态效果系统、战斗回合制流程控制 - Week 5-6 进度提升至 35%" --mode now
 ```
 
-替换 `[任务摘要]` 为实际完成的任务描述。
+---
+
+**创建时间**: 2026-03-08 06:20
+**优先级**: P2（战斗系统核心）
