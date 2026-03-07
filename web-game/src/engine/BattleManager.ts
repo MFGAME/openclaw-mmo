@@ -19,6 +19,7 @@ import {
 } from './BattleState';
 import { monsterDataLoader as _monsterDataLoader } from './MonsterData';
 import { techniqueDataLoader as _techniqueDataLoader } from './TechniqueData';
+import { experienceSystem } from './ExperienceSystem';
 
 /**
  * 战斗配置接口
@@ -523,26 +524,48 @@ export class BattleManager {
   private grantExperience(): void {
     if (!this.battleState) return;
 
-    // 计算总经验值
-    let totalExp = 0;
-    for (const enemy of this.battleState.enemyParty) {
-      totalExp += Math.floor(enemy.level * 50 * (1 + Math.random() * 0.2));
-    }
-
-    // 分配给存活的玩家怪物
+    // 使用 ExperienceSystem 处理经验值获取
     const alivePlayers = this.battleState.playerParty.filter(u => !u.isFainted);
-    const expPerUnit = Math.floor(totalExp / alivePlayers.length);
 
     for (const unit of alivePlayers) {
-      unit.exp += expPerUnit;
-      this.emitEvent({
-        type: 'exp_gain',
-        targetId: unit.id,
-        value: expPerUnit,
-        text: `${unit.name} 获得了 ${expPerUnit} 点经验值！`,
-      });
+      // 计算从每个敌人获得的 experience
+      for (const enemy of this.battleState.enemyParty) {
+        if (enemy.isFainted) {
+          // 击败敌人获得经验值
+          const expGained = experienceSystem.calculateExpGained(
+            enemy,
+            unit.level,
+            alivePlayers.length
+          );
 
-      // TODO: 检查升级
+          // 获取怪物基础数据（用于属性成长）
+          const monsterData = _monsterDataLoader.getMonster(unit.monsterId) || undefined;
+
+          // 处理经验值获取（包含升级检查）
+          const result = experienceSystem.processExperienceGain(
+            unit,
+            expGained,
+            monsterData
+          );
+
+          // 发送经验事件
+          this.emitEvent({
+            type: 'exp_gain',
+            targetId: unit.id,
+            value: expGained,
+            text: `${unit.name} 获得了 ${expGained} 点经验值！`,
+          });
+
+          // 如果学习了新技能，发送技能学习事件
+          for (const learned of result.learnedTechniques) {
+            this.emitEvent({
+              type: 'damage',
+              targetId: unit.id,
+              text: `${unit.name} 学会了 ${learned.techniqueName}！`,
+            });
+          }
+        }
+      }
     }
   }
 

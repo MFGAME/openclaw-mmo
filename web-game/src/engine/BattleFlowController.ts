@@ -24,6 +24,7 @@ import {
 import { BattleCalculator, DamageResult, ElementType } from './BattleCalculator';
 import { StatusEffectManager } from './StatusEffectManager';
 import { TechniqueData, TechniqueCategory } from './TechniqueData';
+import { battleAI, AIDifficulty } from './BattleAI';
 
 /**
  * 回合阶段枚举（更详细的阶段划分）
@@ -169,38 +170,34 @@ export class BattleFlowController {
 
   /**
    * 生成敌方 AI 行动
+   * 使用 BattleAI 智能生成行动
    */
   private generateEnemyActions(battleState: BattleState): void {
     for (const enemy of battleState.enemyParty) {
       if (enemy.isFainted) continue;
 
-      // 简单 AI：随机选择攻击或技能
-      const action: BattleAction = {
-        type: Math.random() > 0.3 ? ActionType.ATTACK : ActionType.TECHNIQUE,
-        actorId: enemy.id,
-        targetIds: [this.getRandomPlayerTarget(battleState)],
-        priority: enemy.speed,
-      };
-
-      // 如果使用技能，随机选择一个技能
-      if (action.type === ActionType.TECHNIQUE && enemy.techniques.length > 0) {
-        action.techniqueId = enemy.techniques[Math.floor(Math.random() * enemy.techniques.length)];
+      // 使用 BattleAI 生成行动
+      const action = battleAI.generateAction(enemy, battleState);
+      if (action) {
+        this.actionQueue.push(action);
       }
-
-      this.actionQueue.push(action);
     }
   }
 
   /**
-   * 获取随机玩家目标
+   * 设置 AI 难度
    */
-  private getRandomPlayerTarget(battleState: BattleState): string {
-    const alivePlayers = battleState.playerParty.filter(u => !u.isFainted);
-    if (alivePlayers.length === 0) return '';
-
-    const target = alivePlayers[Math.floor(Math.random() * alivePlayers.length)];
-    return target.id;
+  setAIDifficulty(difficulty: AIDifficulty): void {
+    battleAI.setDifficulty(difficulty);
   }
+
+  /**
+   * 获取 AI 难度
+   */
+  getAIDifficulty(): AIDifficulty {
+    return battleAI.getDifficulty();
+  }
+
 
   /**
    * 提交玩家行动
