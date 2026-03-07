@@ -394,26 +394,138 @@ export class ExperienceSystem {
   /**
    * 检查可学习的技能
    *
-   * @param _monsterData 怪物基础数据（未使用，保留用于未来扩展）
-   * @param _level 当前等级（未使用，保留用于未来扩展）
-   * @param _knownTechniques 已学会的技能列表（未使用，保留用于未来扩展）
+   * @param monsterData 怪物基础数据
+   * @param level 当前等级
+   * @param knownTechniques 已学会的技能列表
    * @returns 可学习的新技能列表
    */
   private checkLearnableTechniques(
-    _monsterData: MonsterData,
-    _level: number,
-    _knownTechniques: string[]
+    monsterData: MonsterData,
+    level: number,
+    knownTechniques: string[]
   ): TechniqueLearnInfo[] {
     const learned: TechniqueLearnInfo[] = [];
 
-    // 遍历怪物的技能列表
-    // 这里需要从 TechniqueDataLoader 获取技能学习等级信息
-    // 简化实现：根据怪物数据中的 tech_id 判断
+    // 从怪物数据中获取技能列表和对应的学习等级
+    // Tuxemon 数据格式：monsterData.techniques 包含初始技能
+    // 实际项目中应该从技能学习表中获取特定等级可学习的技能
+    if (monsterData.techniques && monsterData.techniques.length > 0) {
+      // 简化实现：假设技能在特定等级学习
+      // 实际项目中应该从怪物数据或技能数据中读取 learn_at 字段
+      const learnLevels: Record<string, number> = {
+        'tackle': 1,
+        'scratch': 1,
+        'peck': 1,
+        'ember': 5,
+        'water_gun': 5,
+        'vine_whip': 5,
+        'thunder_shock': 5,
+        'quick_attack': 8,
+        'bite': 12,
+        'flamethrower': 15,
+        'water_pulse': 15,
+        'razor_leaf': 15,
+        'thunderbolt': 15,
+        'fire_blast': 25,
+        'hydro_pump': 25,
+        'solar_beam': 25,
+        'thunder': 25,
+      };
 
-    // 实际实现需要从 Tuxemon 数据中获取技能学习表
-    // 以下为示例逻辑
+      // 检查怪物已知技能是否应该在学习等级
+      for (const techId of monsterData.techniques) {
+        if (learnLevels[techId] && learnLevels[techId] === level) {
+          if (!knownTechniques.includes(techId)) {
+            learned.push({
+              techniqueId: techId,
+              techniqueName: this.getTechniqueName(techId),
+              learnLevel: level,
+            });
+          }
+        }
+      }
+    }
+
+    // 检查怪物可能拥有的其他技能
+    // 这里可以扩展为从怪物数据中读取技能学习表
+    // 简化实现：根据等级添加一些基础技能
+    const levelUpSkills = this.getLevelUpSkills(level);
+    for (const skill of levelUpSkills) {
+      if (!knownTechniques.includes(skill)) {
+        learned.push({
+          techniqueId: skill,
+          techniqueName: this.getTechniqueName(skill),
+          learnLevel: level,
+        });
+      }
+    }
 
     return learned;
+  }
+
+  /**
+   * 根据等级获取可学习的技能列表
+   *
+   * @param level 等级
+   * @returns 技能 ID 列表
+   */
+  private getLevelUpSkills(level: number): string[] {
+    // 简化的技能学习表
+    const skillTable: Record<number, string[]> = {
+      1: ['tackle'],
+      3: ['scratch'],
+      5: ['quick_attack'],
+      8: ['peck'],
+      10: ['bite'],
+      12: ['ember', 'water_gun', 'vine_whip', 'thunder_shock'],
+      15: ['flamethrower', 'water_pulse', 'razor_leaf', 'thunderbolt'],
+      18: ['headbutt'],
+      20: ['leer'],
+      22: ['rock_throw'],
+      25: ['fire_blast', 'hydro_pump', 'solar_beam', 'thunder'],
+      28: ['earthquake'],
+      30: ['slam'],
+      35: ['hyper_beam'],
+    };
+
+    return skillTable[level] || [];
+  }
+
+  /**
+   * 获取技能名称
+   *
+   * @param techniqueId 技能 ID
+   * @returns 技能名称
+   */
+  private getTechniqueName(techniqueId: string): string {
+    // 技能名称映射表
+    const nameMap: Record<string, string> = {
+      'tackle': '撞击',
+      'scratch': '抓',
+      'ember': '火花',
+      'water_gun': '水枪',
+      'vine_whip': '藤鞭',
+      'thunder_shock': '电击',
+      'quick_attack': '电光一闪',
+      'peck': '啄',
+      'bite': '咬住',
+      'flamethrower': '喷射火焰',
+      'water_pulse': '水流波动',
+      'razor_leaf': '飞叶快刀',
+      'thunderbolt': '十万伏特',
+      'fire_blast': '大字爆炎',
+      'hydro_pump': '水炮',
+      'solar_beam': '太阳光线',
+      'thunder': '打雷',
+      'headbutt': '头槌',
+      'leer': '瞪眼',
+      'rock_throw': '岩石封',
+      'earthquake': '地震',
+      'slam': '猛撞',
+      'hyper_beam': '破坏光线',
+    };
+
+    return nameMap[techniqueId] || techniqueId;
   }
 
   /**
