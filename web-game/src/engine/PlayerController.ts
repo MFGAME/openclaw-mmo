@@ -118,6 +118,12 @@ export class PlayerController {
   /** 玩家状态 */
   private state: PlayerState = PlayerState.IDLE;
 
+  /** 是否在跑步 */
+  private running: boolean = false;
+
+  /** 基础移动速度（用于跑步计算） */
+  private baseMoveSpeed: number = 200;
+
   /** 配置 */
   private config: PlayerConfig = {
     tileWidth: 32,
@@ -193,6 +199,9 @@ export class PlayerController {
       this.config = { ...this.config, ...config };
     }
 
+    // 设置基础移动速度（用于跑步计算）
+    this.baseMoveSpeed = this.config.moveSpeed;
+
     // 初始化位置
     this.position.x = this.position.tileX * this.config.tileWidth;
     this.position.y = this.position.tileY * this.config.tileHeight;
@@ -247,6 +256,12 @@ export class PlayerController {
    * 处理输入
    */
   private handleInput(): void {
+    // 检测 Shift 键（跑步状态）
+    const isShiftPressed = inputManager.isHeld(KeyCode.SHIFT) || inputManager.isHeld('Shift') ||
+                          inputManager.isHeld(KeyCode.SHIFT.toUpperCase());
+
+    // 平滑切换跑步状态
+    this.running = isShiftPressed;
     const currentTime = Date.now();
 
     // 检查键盘输入
@@ -384,8 +399,11 @@ export class PlayerController {
    * 更新移动动画
    */
   private updateMoveAnimation(deltaTime: number): void {
+    // 跑步时速度加倍（移动时间减半）
+    const currentMoveSpeed = this.running ? this.baseMoveSpeed / 2 : this.baseMoveSpeed;
+
     // 计算移动进度
-    this.moveProgress += deltaTime / this.config.moveSpeed;
+    this.moveProgress += deltaTime / currentMoveSpeed;
 
     if (this.moveProgress >= 1) {
       // 移动完成
@@ -577,6 +595,48 @@ export class PlayerController {
   }
 
   /**
+   * 获取跑步状态
+   */
+  isRunning(): boolean {
+    return this.running;
+  }
+
+  /**
+   * 设置跑步状态
+   */
+  setRunning(running: boolean): void {
+    this.running = running;
+  }
+
+  /**
+   * 切换跑步状态
+   */
+  toggleRunning(): void {
+    this.running = !this.running;
+  }
+
+  /**
+   * 获取基础移动速度
+   */
+  getBaseMoveSpeed(): number {
+    return this.baseMoveSpeed;
+  }
+
+  /**
+   * 设置基础移动速度
+   */
+  setBaseMoveSpeed(speed: number): void {
+    this.baseMoveSpeed = speed;
+  }
+
+  /**
+   * 获取当前移动速度（考虑跑步状态）
+   */
+  getCurrentMoveSpeed(): number {
+    return this.running ? this.baseMoveSpeed / 2 : this.baseMoveSpeed;
+  }
+
+  /**
    * 重置玩家控制器
    */
   reset(): void {
@@ -597,6 +657,7 @@ export class PlayerController {
     this.lastKeyPressTime = 0;
     this.lastMoveTime = 0;
     this.lastDirectionKey = null;
+    this.running = false;
   }
 }
 

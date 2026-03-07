@@ -13,6 +13,7 @@ import { sceneManager, SceneData } from './engine/SceneManager.js';
 import { TMXMapData, TMXTileLayer } from './engine/MapParser.js';
 import { monsterDataLoader } from './engine/MonsterData.js';
 import { techniqueDataLoader } from './engine/TechniqueData.js';
+import { eventSystem } from './engine/EventSystem.js';
 
 
 /**
@@ -163,10 +164,14 @@ class OpenClawGame extends Game {
 
         // 初始化场景管理器
         sceneManager.initialize(this.tileWidth, this.tileHeight);
-        
+
+        // 初始化事件系统
+        eventSystem.initialize(this.tileWidth, this.tileHeight);
+
         // 注册测试场景
         this.createTestScenes();
         console.log('[Game] Scene manager initialized');
+        console.log('[Game] Event system initialized');
 
         try {
             // 加载 Tuxemon 资源
@@ -484,6 +489,10 @@ class OpenClawGame extends Game {
         // 更新交互管理器
         interactionManager.update(deltaTime);
 
+        // 更新事件系统（检查玩家位置触发事件）
+        const playerPos = playerController.getPixelPosition();
+        eventSystem.checkTriggers(playerPos.x, playerPos.y);
+
         // 更新摄像机位置（跟随玩家）
         this.updateCamera();
     }
@@ -749,10 +758,11 @@ class OpenClawGame extends Game {
         const direction = playerController.getFacingDirection();
         const collisionStats = collisionManager.getStats();
         const nearbyNPCs = npcManager.getNearbyNPCs(2);
+        const eventStats = eventSystem.getStats();
 
         ctx.save();
         ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
-        ctx.fillRect(10, 10, 250, 180);
+        ctx.fillRect(10, 10, 250, 200);
 
         ctx.fillStyle = '#48bb78';
         ctx.font = '12px monospace';
@@ -767,11 +777,15 @@ class OpenClawGame extends Game {
         ctx.fillText(`Player Pixel: (${Math.round(pixelPos.x)}, ${Math.round(pixelPos.y)})`, 20, y); y += lineHeight;
         ctx.fillText(`Direction: ${direction}`, 20, y); y += lineHeight;
         ctx.fillText(`State: ${playerController.getState()}`, 20, y); y += lineHeight;
+        ctx.fillText(`Running: ${playerController.isRunning() ? 'YES' : 'NO'}`, 20, y); y += lineHeight;
         ctx.fillText(`Camera: (${Math.round(this.cameraX)}, ${Math.round(this.cameraY)})`, 20, y); y += lineHeight;
         ctx.fillText(`NPC Count: ${npcManager.getAllNPCs().length}`, 20, y); y += lineHeight;
         ctx.fillText(`Nearby NPCs: ${nearbyNPCs.length}`, 20, y); y += lineHeight;
         ctx.fillText(`Collision Layers: ${collisionStats.collisionLayers}`, 20, y); y += lineHeight;
         ctx.fillText(`Solid Tiles: ${collisionStats.solidTiles}`, 20, y); y += lineHeight;
+        ctx.fillText(`Dynamic Collisions: ${collisionStats.dynamicCollisions}`, 20, y); y += lineHeight;
+        ctx.fillText(`Event Triggers: ${eventStats.totalTriggers}`, 20, y); y += lineHeight;
+        ctx.fillText(`Event Variables: ${eventStats.variables}`, 20, y); y += lineHeight;
         ctx.fillText(``, 20, y); y += lineHeight;
         ctx.fillStyle = '#f6e05e';
         ctx.fillText(`Nearby: ${nearbyNPCs.map(n => n.name).join(', ')}`, 20, y);
@@ -805,5 +819,7 @@ if (document.readyState === 'loading') {
 (window as any).npcManager = npcManager;
 (window as any).dialogManager = dialogManager;
 (window as any).interactionManager = interactionManager;
+(window as any).sceneManager = sceneManager;
+(window as any).eventSystem = eventSystem;
 (window as any).monsterDataLoader = monsterDataLoader;
 (window as any).techniqueDataLoader = techniqueDataLoader;

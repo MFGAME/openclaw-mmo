@@ -40,6 +40,33 @@ export interface Circle {
 }
 
 /**
+ * 碰撞区域接口
+ */
+export interface CollisionArea {
+  /** 碰撞区域唯一 ID */
+  id: string;
+  /** 碰撞区域类型 */
+  type: 'rect' | 'circle';
+  /** 矩形区域参数 */
+  rect?: { x: number; y: number; width: number; height: number };
+  /** 圆形区域参数 */
+  circle?: { x: number; y: number; radius: number };
+  /** 是否为临时碰撞（带过期时间） */
+  temporary?: boolean;
+  /** 过期时间戳（毫秒） */
+  expireTime?: number;
+  /** 自定义数据 */
+  customData?: Record<string, any>;
+}
+
+// 临时碰撞数据接口 - 待实现
+// interface TemporaryCollision {
+//   key: string;
+//   expireTime: number;
+//   timerId?: number;
+// }
+
+/**
  * 碰撞结果接口
  */
 export interface CollisionResult {
@@ -104,6 +131,15 @@ export class CollisionManager {
 
   /** 调试模式 */
   private debugMode = false;
+
+  /** 动态碰撞点集合（"x,y" 格式） */
+  private dynamicCollisions: Set<string> = new Set();
+
+  // 临时碰撞映射（"x,y" -> TemporaryCollision）- 待实现
+  // private temporaryCollisions: Map<string, TemporaryCollision> = new Map();
+
+  // 碰撞区域映射（ID -> CollisionArea）- 待实现
+  // private collisionAreas: Map<string, CollisionArea> = new Map();
 
   /**
    * 私有构造函数，确保单例
@@ -207,11 +243,17 @@ export class CollisionManager {
 
   /**
    * 检查瓦片是否为固体
+   * 同时检查静态碰撞（地图瓦片）和动态碰撞（运行时添加）
    * @param tileX 瓦片 X 坐标
    * @param tileY 瓦片 Y 坐标
    * @returns 是否为固体
    */
   isTileSolid(tileX: number, tileY: number): boolean {
+    // 首先检查动态碰撞
+    if (this.hasCollision(tileX, tileY)) {
+      return true;
+    }
+
     const gid = this.getTileGid(tileX, tileY);
     if (gid === 0) return false;
 
@@ -487,6 +529,71 @@ export class CollisionManager {
   }
 
   /**
+   * 添加动态碰撞点
+   * 用于可破坏物体、临时障碍物、NPC 移动碰撞等场景
+   * @param x 瓦片 X 坐标
+   * @param y 瓦片 Y 坐标
+   */
+  addCollision(x: number, y: number): void {
+    const key = `${x},${y}`;
+    if (!this.dynamicCollisions.has(key)) {
+      this.dynamicCollisions.add(key);
+      // 清除碰撞缓存，确保碰撞检测生效
+      this.clearCache();
+      console.log(`[CollisionManager] 添加动态碰撞: (${x}, ${y})`);
+    }
+  }
+
+  /**
+   * 移除动态碰撞点
+   * @param x 瓦片 X 坐标
+   * @param y 瓦片 Y 坐标
+   */
+  removeCollision(x: number, y: number): void {
+    const key = `${x},${y}`;
+    if (this.dynamicCollisions.delete(key)) {
+      // 清除碰撞缓存，确保碰撞检测生效
+      this.clearCache();
+      console.log(`[CollisionManager] 移除动态碰撞: (${x}, ${y})`);
+    }
+  }
+
+  /**
+   * 检查指定位置是否有动态碰撞
+   * @param x 瓦片 X 坐标
+   * @param y 瓦片 Y 坐标
+   * @returns 是否有动态碰撞
+   */
+  hasCollision(x: number, y: number): boolean {
+    return this.dynamicCollisions.has(`${x},${y}`);
+  }
+
+  /**
+   * 清除所有动态碰撞点
+   */
+  clearDynamicCollisions(): void {
+    const count = this.dynamicCollisions.size;
+    this.dynamicCollisions.clear();
+    this.clearCache();
+    if (count > 0) {
+      console.log(`[CollisionManager] 清除了 ${count} 个动态碰撞点`);
+    }
+  }
+
+  /**
+   * 获取所有动态碰撞点
+   * @returns 动态碰撞点数组
+   */
+  getDynamicCollisions(): Array<{ x: number; y: number }> {
+    const result: Array<{ x: number; y: number }> = [];
+    for (const key of this.dynamicCollisions) {
+      const [x, y] = key.split(',').map(Number);
+      result.push({ x, y });
+    }
+    return result;
+  }
+
+  /**
    * 获取碰撞统计信息
    */
   getStats(): {
@@ -494,12 +601,14 @@ export class CollisionManager {
     collisionLayers: number;
     solidTiles: number;
     cacheSize: number;
+    dynamicCollisions: number;
   } {
     return {
       hasMap: this.mapData !== null,
       collisionLayers: this.collisionLayers.length,
       solidTiles: this.solidTileSet.size,
       cacheSize: this.collisionCache.size,
+      dynamicCollisions: this.dynamicCollisions.size,
     };
   }
 }
