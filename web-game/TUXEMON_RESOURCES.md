@@ -189,16 +189,16 @@ const map = await resourceManager.loadMap('start_town');
 
 | 类别 | 状态 | 备注 |
 |------|------|------|
-| 怪物资源 | ⏳ 未开始 | 需要实现加载逻辑 |
-| 技能资源 | ⏳ 未开始 | 需要实现加载逻辑 |
-| 道具资源 | ⏳ 未开始 | 需要实现加载逻辑 |
-| NPC 资源 | ⏳ 未开始 | 需要实现加载逻辑 |
+| 怪物资源 | ✅ **已实装** | **411 个怪物 JSON 已复制** |
+| 技能资源 | ⏳ 未开始 | 需要复制 resources/db/technique/ |
+| 道具资源 | ⏳ 未开始 | 需要复制 resources/db/item/ |
+| NPC 资源 | ⏳ 未开始 | 需要复制 resources/db/npc/ |
 | 地图资源 | ✅ 已实现 | MapParser + TileRenderer |
 | 瓦片资源 | ✅ 已实现 | TileRenderer |
-| 音乐资源 | ⏳ 未开始 | 需要实现 Web Audio |
-| 音效资源 | ⏳ 未开始 | 需要实现 Web Audio |
-| UI 资源 | ⏳ 未开始 | 需要实现 UI 系统 |
-| 状态效果 | ⏳ 未开始 | 需要实现状态系统 |
+| 音乐资源 | ⏳ 未开始 | 需要复制 resources/music/ |
+| 音效资源 | ⏳ 未开始 | 需要复制 resources/sounds/ |
+| UI 资源 | ⏳ 未开始 | 需要复制 resources/gfx/ui/ |
+| 状态效果 | ⏳ 未开始 | 需要复制 resources/db/status/ |
 
 ---
 

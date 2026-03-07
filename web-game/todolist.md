@@ -1,145 +1,96 @@
 # OpenClaw MMO - 当前任务清单
 
-**日期：** 2026-03-07
-**阶段：** 资源实装 + 核心功能补充
+**日期：** 2026-03-08 00:14
+**阶段：** 美术资源实装（最高优先级）
 
 ---
 
-## ⚠️ 真实进度汇报
+## ⚠️ 真实进度
 
 **总体进度：~20%**
+**美术资源：0% 未实装（最高优先级）**
 
-**已验证未完成的任务**：
-1. ❌ **美术资源实装（0%）** - 所有 Tuxemon 资源都未加载
-2. ⚠️ **Week 3-4 核心功能（78%）** - 缺少 A* 寻路、路径队列、动态碰撞
-3. ❌ **Week 5-6 战斗系统（0%）** - 完全未开始
-4. ❌ **Phase 1 MMO 功能（0%）** - 完全未开始
+**当前任务：** 从 Tuxemon 项目复制资源到项目
 
 ---
 
-## 📋 优先任务（按优先级排序）
+## 📋 本轮任务（3个细粒度任务）
 
-### 🔴 P0 - 资源实装（必须完成）
-
-**Task 1: 复制 Tuxemon 资源到项目**
-**目标：** 将所有 Tuxemon 原版资源复制到 assets/tuxemon/ 目录
+### Task 1: 克隆 Tuxemon 仓库
+**目标：** 获取 Tuxemon 原版资源
 
 **具体步骤：**
-- [ ] 从 Tuxemon GitHub 下载资源包
-- [ ] 复制怪物资源（411个）到 `assets/tuxemon/monsters/`
-- [ ] 复制技能资源（274个）到 `assets/tuxemon/techniques/`
-- [ ] 复制道具资源（221个）到 `assets/tuxemon/items/`
-- [ ] 复制 NPC 资源（123个）到 `assets/tuxemon/npcs/`
-- [ ] 复制地图资源（50+）到 `assets/tuxemon/maps/`
-- [ ] 复制瓦片资源（80+）到 `assets/tuxemon/gfx/tilesets/`
-- [ ] 复制音乐资源（20+）到 `assets/tuxemon/music/`
-- [ ] 复制音效资源（100+）到 `assets/tuxemon/sounds/`
-- [ ] 复制 UI 资源到 `assets/tuxemon/gfx/ui/`
+- [ ] 克隆 Tuxemon GitHub 仓库
+- [ ] 验证资源目录结构
+- [ ] 确认许可证文件存在
 
 **预期文件：**
-- `assets/tuxemon/` 目录（完整资源包）
+- `tuxemon-source/` 目录（Tuxemon 仓库）
 
-**参考文档：** `TUXEMON_RESOURCES.md`
+**参考：**
+- GitHub: https://github.com/Tuxemon/Tuxemon
+- 资源路径: `tuxemon/resources/`
 
 ---
 
-**Task 2: 实现资源加载器**
-**目标：** 实现统一的资源加载系统
+### Task 2: 创建 assets/tuxemon/ 目录结构
+**目标：** 准备好资源存放目录
 
 **具体步骤：**
-- [ ] 创建 `ResourceManager.ts` 类
-- [ ] 实现怪物数据加载（loadMonster）
-- [ ] 实现技能数据加载（loadTechnique）
-- [ ] 实现道具数据加载（loadItem）
-- [ ] 实现 NPC 数据加载（loadNPC）
-- [ ] 实现地图数据加载（loadMap）
-- [ ] 实现音频资源加载（loadSound/loadMusic）
-- [ ] 实现图片资源加载（loadImage）
-- [ ] 添加加载进度追踪
-- [ ] 添加错误处理和重试机制
+- [ ] 创建 `web-game/assets/tuxemon/` 目录
+- [ ] 创建子目录：
+  - [ ] `monsters/` - 怪物资源
+  - [ ] `techniques/` - 技能资源
+  - [ ] `items/` - 道具资源
+  - [ ] `npcs/` - NPC 资源
+  - [ ] `maps/` - 地图资源
+  - [ ] `gfx/tilesets/` - 瓦片资源
+  - [ ] `gfx/ui/` - UI 资源
+  - [ ] `music/` - 音乐资源
+  - [ ] `sounds/` - 音效资源
+- [ ] 复制 LICENSE 文件（GPL-3.0）
 
 **预期文件：**
-- `src/engine/ResourceManager.ts`（新建）
+- `web-game/assets/tuxemon/` 目录（完整结构）
 
 ---
 
-**Task 3: 集成资源到游戏系统**
-**目标：** 将加载的资源集成到各个游戏系统
+### Task 3: 复制怪物资源（411个）
+**目标：** 实装第一批核心资源
 
 **具体步骤：**
-- [ ] 修改 Game.ts 使用 ResourceManager
-- [ ] 修改 NPCManager 使用 NPC 资源
-- [ ] 修改 TileRenderer 使用瓦片资源
-- [ ] 创建音频播放器（AudioPlayer.ts）
-- [ ] 集成音乐和音效到游戏
+- [ ] 复制怪物精灵图（正面、背面、战斗动画）
+- [ ] 复制怪物数据 JSON
+- [ ] 验证文件数量（411个怪物）
+- [ ] 更新 TUXEMON_RESOURCES.md 标记完成
 
 **预期文件：**
-- `src/engine/Game.ts`（修改）
-- `src/engine/NPCManager.ts`（修改）
-- `src/engine/TileRenderer.ts`（修改）
-- `src/engine/AudioPlayer.ts`（新建）
+- `web-game/assets/tuxemon/monsters/` 目录（411个怪物）
 
----
-
-### 🟡 P1 - 核心功能补充（Week 3-4 剩余）
-
-**Task 4: 实现 A* 寻路算法**
-- [ ] 创建 `src/engine/Pathfinder.ts`
-- [ ] 实现 A* 算法核心逻辑
-- [ ] 集成碰撞地图
-
-**Task 5: 实现路径队列系统**
-- [ ] 在 NPCManager 中添加路径队列
-- [ ] 实现路径跟随逻辑
-
-**Task 6: 实现动态碰撞管理**
-- [ ] 在 CollisionManager 中添加 addCollision/removeCollision
-- [ ] 支持实体碰撞注册
-
----
-
-### 🟢 P2 - 战斗系统（Week 5-6）
-
-**Task 7-15: 战斗系统完整实现**
-- [ ] 战斗界面（回合制 UI）
-- [ ] 怪物数据加载（411个怪物 JSON）
-- [ ] 技能数据加载（274个技能 JSON）
-- [ ] 属性克制系统（14种元素）
-- [ ] 伤害计算公式
-- [ ] 状态效果（35种状态）
-- [ ] 战斗动画（技能特效）
-- [ ] 捕捉系统
-- [ ] 经验值和升级
-- [ ] AI 对手
-
----
-
-### 🔵 P3 - MMO 功能（Phase 1）
-
-**Task 16-19: MMO 功能实现**
-- [ ] 机器人系统
-- [ ] 网络对战系统
-- [ ] 经济系统
-- [ ] 飞书集成
+**验证命令：**
+```bash
+ls -la web-game/assets/tuxemon/monsters/ | wc -l
+# 应该看到 411 个目录
+```
 
 ---
 
 ## ✅ 验收标准
 
-1. **资源实装：** assets/tuxemon/ 目录包含所有 Tuxemon 原版资源
-2. **资源加载：** ResourceManager 可以正确加载所有资源类型
-3. **系统集成：** 游戏运行时使用 Tuxemon 原版资源（无占位符）
+1. **Tuxemon 仓库克隆成功**
+2. **assets/tuxemon/ 目录结构完整**
+3. **怪物资源文件真实存在（411个）**
 
 ---
 
-## 📝 重要说明
+## 📝 备注
 
 - **所有资源必须使用 Tuxemon 原版资源**
 - **禁止使用占位符、禁止自制素材**
 - **参考文档：** `TUXEMON_RESOURCES.md`
-- **资源来源：** https://github.com/Tuxemon/Tuxemon
+- **下次心跳优先：** 复制技能资源（274个）
 
 ---
 
-创建日期：2026-03-07
-最后更新：2026-03-07 23:16（修正真实进度，添加资源实装任务）
+创建日期：2026-03-08
+最后更新：2026-03-08 00:14（动态生成 - 心跳测试）
