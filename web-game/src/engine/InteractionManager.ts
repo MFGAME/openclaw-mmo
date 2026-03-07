@@ -2,6 +2,7 @@ import { inputManager, KeyCode } from './InputManager';
 import { playerController, PlayerState } from './PlayerController';
 import { npcManager, NPC } from './NPCManager';
 import { dialogManager } from './DialogManager';
+import { sceneManager } from './SceneManager';
 import { TMXObject } from './MapParser';
 
 /**
@@ -168,6 +169,9 @@ export class InteractionManager {
 
     // 更新可交互对象检测
     this.updateInteractable();
+
+    // 检查传送门
+    this.checkTeleport();
   }
 
   /**
@@ -539,6 +543,38 @@ export class InteractionManager {
     this.showPrompt = false;
     this.eventHistory = [];
     this.lastInteractionTime = 0;
+  }
+
+  /**
+   * 检查传送门
+   * 自动检测玩家是否站在传送门上
+   */
+  private checkTeleport(): void {
+    // 如果正在对话中或场景切换中，不检查传送门
+    if (dialogManager.isDialogueActive() || sceneManager.isTransitioning()) {
+      return;
+    }
+
+    // 检查玩家是否站在传送门上
+    const teleport = sceneManager.checkPlayerOnTeleport();
+    if (teleport) {
+      console.log(`[InteractionManager] Player on teleport: ${teleport.name}`);
+      
+      // 触发场景切换
+      sceneManager.triggerTeleport(teleport);
+      
+      // 记录事件
+      this.recordEvent({
+        type: InteractionType.SCENE_CHANGE,
+        timestamp: Date.now(),
+        data: {
+          teleportId: teleport.id,
+          targetMapId: teleport.targetMapId,
+          targetX: teleport.targetX,
+          targetY: teleport.targetY,
+        },
+      });
+    }
   }
 
   /**

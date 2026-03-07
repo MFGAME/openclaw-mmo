@@ -9,6 +9,7 @@ import { playerController, Direction } from './engine/PlayerController.js';
 import { npcManager, NPCBehavior, NPCInteractionType, NPCDialogue } from './engine/NPCManager.js';
 import { dialogManager } from './engine/DialogManager.js';
 import { interactionManager } from './engine/InteractionManager.js';
+import { sceneManager, SceneData } from './engine/SceneManager.js';
 import { TMXMapData, TMXTileLayer } from './engine/MapParser.js';
 
 
@@ -158,6 +159,13 @@ class OpenClawGame extends Game {
         interactionManager.initialize();
         console.log('[Game] Interaction manager initialized');
 
+        // 初始化场景管理器
+        sceneManager.initialize(this.tileWidth, this.tileHeight);
+        
+        // 注册测试场景
+        this.createTestScenes();
+        console.log('[Game] Scene manager initialized');
+
         try {
             // 加载所有资源
             if (this.resourceManager.getQueueSize() > 0) {
@@ -306,6 +314,106 @@ class OpenClawGame extends Game {
     }
 
     /**
+     * 创建测试场景
+     */
+    private createTestScenes(): void {
+        // 主地图场景
+        const mainMapData = createTestMapData();
+        const mainScene: SceneData = {
+            id: 'main_map',
+            name: '主地图',
+            mapData: mainMapData,
+            teleports: [
+                {
+                    id: 'teleport_to_house',
+                    name: '进入房屋',
+                    x: 18 * this.tileWidth,
+                    y: 5 * this.tileHeight,
+                    width: this.tileWidth,
+                    height: this.tileHeight,
+                    targetMapId: 'house_interior',
+                    targetX: 2,
+                    targetY: 2,
+                    type: 'door',
+                },
+            ],
+            isIndoor: false,
+            type: 'town',
+        };
+
+        // 室内场景（房屋内部）
+        const houseMapData = this.createHouseMapData();
+        const houseScene: SceneData = {
+            id: 'house_interior',
+            name: '房屋内部',
+            mapData: houseMapData,
+            teleports: [
+                {
+                    id: 'teleport_to_main',
+                    name: '离开房屋',
+                    x: 2 * this.tileWidth,
+                    y: 4 * this.tileHeight,
+                    width: this.tileWidth,
+                    height: this.tileHeight,
+                    targetMapId: 'main_map',
+                    targetX: 18,
+                    targetY: 6,
+                    type: 'door',
+                },
+            ],
+            isIndoor: true,
+            type: 'building',
+        };
+
+        // 注册场景
+        sceneManager.registerScene(mainScene);
+        sceneManager.registerScene(houseScene);
+
+        // 设置当前场景为主地图
+        sceneManager.setCurrentScene('main_map');
+    }
+
+    /**
+     * 创建房屋内部地图
+     */
+    private createHouseMapData(): TMXMapData {
+        // 5x5 的小房间
+        const HOUSE_WIDTH = 5;
+        const HOUSE_HEIGHT = 5;
+        const houseMapData = [
+            1, 1, 1, 1, 1,
+            1, 0, 0, 0, 1,
+            1, 0, 0, 0, 1,
+            1, 0, 0, 0, 1,
+            1, 1, 0, 1, 1,  // 门在底部中间
+        ];
+
+        const tileLayer: TMXTileLayer = {
+            name: 'house_floor',
+            width: HOUSE_WIDTH,
+            height: HOUSE_HEIGHT,
+            data: houseMapData,
+            properties: {},
+            visible: true,
+            opacity: 1,
+            offsetX: 0,
+            offsetY: 0,
+        };
+
+        return {
+            width: HOUSE_WIDTH,
+            height: HOUSE_HEIGHT,
+            tileWidth: this.tileWidth,
+            tileHeight: this.tileHeight,
+            renderOrder: 'right-down',
+            tileLayers: [tileLayer],
+            objectGroups: [],
+            tilesets: [],
+            properties: {},
+        };
+    }
+
+    /**
      * 绑定调试按键
      */
     private bindDebugKeys(): void {
@@ -347,6 +455,9 @@ class OpenClawGame extends Game {
      * 更新游戏状态
      */
     protected onUpdate(deltaTime: number): void {
+        // 更新场景管理器
+        sceneManager.update(deltaTime);
+
         // 更新玩家
         playerController.update(deltaTime);
 
@@ -426,6 +537,9 @@ class OpenClawGame extends Game {
 
         // 渲染对话 UI
         dialogManager.render(ctx, this.getWidth(), this.getHeight());
+
+        // 渲染场景切换效果
+        sceneManager.render(ctx, this.getWidth(), this.getHeight());
 
         // 渲染调试信息
         if (this.showDebugInfo) {
