@@ -250,6 +250,8 @@ class OpenClawGame extends Game {
             visible: true,
             interactable: true,
             collisionRadius: 12,
+            usePathfinding: false,
+            pathQueue: undefined,
         });
 
         // 商人
@@ -283,6 +285,8 @@ class OpenClawGame extends Game {
             visible: true,
             interactable: true,
             collisionRadius: 12,
+            usePathfinding: true,
+            pathQueue: undefined,
         });
 
         // 巡逻的守卫
@@ -318,6 +322,8 @@ class OpenClawGame extends Game {
             visible: true,
             interactable: true,
             collisionRadius: 12,
+            usePathfinding: true,
+            pathQueue: undefined,
         });
     }
 

@@ -1,5 +1,6 @@
 import { inputManager, KeyCode, SwipeDirection } from './InputManager';
 import { collisionManager } from './CollisionManager';
+import { pathfinder, PathPoint } from './Pathfinder';
 
 /**
  * 方向枚举
@@ -548,6 +549,31 @@ export class PlayerController {
     this.targetY = this.position.y;
     this.moveProgress = 0;
     this.state = PlayerState.IDLE;
+  }
+
+  /**
+   * 获取从当前位置到目标位置的路径
+   * @param targetX 目标 X 坐标
+   * @param targetY 目标 Y 坐标
+   * @returns 路径点数组，如果没有路径返回空数组
+   */
+  findPathTo(targetX: number, targetY: number): PathPoint[] {
+    return pathfinder.findPath(this.position.tileX, this.position.tileY, targetX, targetY);
+  }
+
+  /**
+   * 检查目标位置是否可直接到达
+   * @param targetX 目标 X 坐标
+   * @param targetY 目标 Y 坐标
+   * @returns 是否可直接到达
+   */
+  isDirectlyReachable(targetX: number, targetY: number): boolean {
+    return pathfinder.isDirectlyReachable(
+      this.position.tileX,
+      this.position.tileY,
+      targetX,
+      targetY
+    );
   }
 
   /**
