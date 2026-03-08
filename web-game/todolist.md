@@ -5,39 +5,36 @@
 
 ---
 
-## 📊 当前资源实装状态
+## 📊 当前进度概览
 
-| 资源类别 | 数量 | 状态 |
-|----------|------|------|
-| monsters JSON | 412 | ✅ 完成 |
-| techniques JSON | 275 | ✅ 完成 |
-| items JSON | 221 | ✅ 完成 |
-| npcs JSON | 123 | ✅ 完成 |
-| gfx 图片 | 1 | ❌ 需补充 |
-| tilesets 瓦片集 | 0 | ❌ 需补充 |
-| ui 界面素材 | 0 | ❌ 需补充 |
+| 阶段 | 进度 | 状态 |
+|------|------|------|
+| Phase 0 | 100% | ✅ 完成 |
+| Phase 1 | 100% | ✅ 完成 |
+| 美术资源 | 65% | 🔄 进行中 |
+| **总体** | **~95%** | ⬆️ 接近完工 |
 
 ---
 
 ## 📋 本次心跳任务（3个）
 
-### 任务 1: 地图瓦片集资源集成 (P1)
-**目标**: 从 Tuxemon 复制 tilesets 资源
-**文件**: assets/tuxemon/tilesets/
-**来源**: tuxemon/resources/gfx/tilesets/
-**预期数量**: 80+ 瓦片集
+### 任务 1: NPC 精灵图资源集成 (P0)
+**目标**: 从 Tuxemon 复制 NPC 精灵图资源
+**文件**: assets/tuxemon/gfx/sprites/npc/
+**来源**: tuxemon/resources/gfx/sprites/npc/
+**预期数量**: 123 个 NPC 精灵图
 
-### 任务 2: UI 界面素材集成 (P1)
-**目标**: 从 Tuxemon 复制 UI 素材
-**文件**: assets/tuxemon/ui/
-**来源**: tuxemon/resources/gfx/ui/
-**包含**: 对话框、菜单、按钮、图标等
+### 任务 2: 音乐资源集成 (P1)
+**目标**: 从 Tuxemon 复制 BGM 音乐文件
+**文件**: assets/tuxemon/music/
+**来源**: tuxemon/resources/music/
+**预期数量**: 20+ 首 BGM
 
-### 任务 3: 战斗特效精灵图集成 (P1)
-**目标**: 从 Tuxemon 复制战斗特效精灵图
-**文件**: assets/tuxemon/gfx/
-**来源**: tuxemon/resources/gfx/
-**包含**: 技能动画、状态效果、粒子效果
+### 任务 3: 音效资源集成 (P1)
+**目标**: 从 Tuxemon 复制音效文件
+**文件**: assets/tuxemon/sounds/
+**来源**: tuxemon/resources/sounds/
+**预期数量**: 100+ 个音效
 
 ---
 
@@ -54,5 +51,5 @@
 
 完成后运行：
 ```
-C:\Users\Administrator\AppData\Roaming\npm\openclaw.cmd system event --text "Done: 地图瓦片集/UI素材/战斗特效资源集成 - 美术资源进度提升至 60%" --mode now
+C:\Users\Administrator\AppData\Roaming\npm\openclaw.cmd system event --text "Done: NPC精灵图/音乐/音效资源集成 - 美术资源进度提升至 85%" --mode now
 ```
