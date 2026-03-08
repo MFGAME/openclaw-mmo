@@ -1,66 +1,58 @@
 # OpenClaw MMO - 当前任务清单
 
-**生成时间**: 2026-03-08 11:02
-**目标**: 完善剩余功能，达成 100% 完工
+**生成时间**: 2026-03-08 11:25
+**目标**: 完善美术资源实装，项目达到 100% 完工
 
 ---
 
-## 📋 当前 3 个任务（优先级排序）
+## 📊 当前资源实装状态
 
-### 任务 1: 跑步/跳跃系统增强 (P1 - Week 3-4 补充)
-**目标**: 完善玩家移动系统
-
-**具体步骤**:
-1. 检查现有 RunningSystem.ts 或 PlayerController.ts
-2. 实现跑步状态（双击方向键或按住 Shift）
-3. 实现跳跃动作（空格键，带动画）
-4. 添加跑步/跳跃音效
-5. 添加体力/耐力系统（可选）
-
-**验收标准**:
-- ✅ 玩家可以跑步（移动速度提升）
-- ✅ 玩家可以跳跃（视觉动画）
-- ✅ npm run build 编译通过
+| 资源类别 | 数量 | 状态 |
+|----------|------|------|
+| monsters JSON | 412 | ✅ 完成 |
+| techniques JSON | 275 | ✅ 完成 |
+| items JSON | 221 | ✅ 完成 |
+| npcs JSON | 123 | ✅ 完成 |
+| gfx 图片 | 1 | ❌ 需补充 |
+| tilesets 瓦片集 | 0 | ❌ 需补充 |
+| ui 界面素材 | 0 | ❌ 需补充 |
 
 ---
 
-### 任务 2: NPC 商店系统完善 (P2 - Week 9 补充)
-**目标**: 完善 NPC 商店交互
+## 📋 本次心跳任务（3个）
 
-**具体步骤**:
-1. 检查现有 ShopManager.ts 或 NPCShopSystem.ts
-2. 实现商店 NPC 交互（对话触发商店界面）
-3. 实现商品列表展示
-4. 实现购买/出售功能
-5. 集成货币系统
+### 任务 1: 地图瓦片集资源集成 (P1)
+**目标**: 从 Tuxemon 复制 tilesets 资源
+**文件**: assets/tuxemon/tilesets/
+**来源**: tuxemon/resources/gfx/tilesets/
+**预期数量**: 80+ 瓦片集
 
-**验收标准**:
-- ✅ 与 NPC 对话可以打开商店界面
-- ✅ 可以购买和出售道具
-- ✅ npm run build 编译通过
+### 任务 2: UI 界面素材集成 (P1)
+**目标**: 从 Tuxemon 复制 UI 素材
+**文件**: assets/tuxemon/ui/
+**来源**: tuxemon/resources/gfx/ui/
+**包含**: 对话框、菜单、按钮、图标等
 
----
-
-### 任务 3: 成就系统实现 (P2 - 扩展功能)
-**目标**: 实现游戏成就追踪
-
-**具体步骤**:
-1. 创建 `src/engine/AchievementSystem.ts`
-2. 定义成就类型（战斗、收集、探索）
-3. 实现成就触发条件检测
-4. 实现成就通知 UI
-5. 实现成就奖励发放
-
-**验收标准**:
-- ✅ AchievementSystem.ts 文件存在
-- ✅ 成就可以正常触发和保存
-- ✅ npm run build 编译通过
+### 任务 3: 战斗特效精灵图集成 (P1)
+**目标**: 从 Tuxemon 复制战斗特效精灵图
+**文件**: assets/tuxemon/gfx/
+**来源**: tuxemon/resources/gfx/
+**包含**: 技能动画、状态效果、粒子效果
 
 ---
 
-## ⚠️ 重要提醒
+## ⚠️ 重要规则
 
 1. **所有资源必须使用 Tuxemon 原版资源**
 2. **阅读 TUXEMON_RESOURCES.md 了解资源结构**
 3. **禁止使用占位符、禁止自制素材**
-4. **完成后运行**: `openclaw.cmd system event --text "Done: 跑步跳跃/商店/成就系统 - 总体进度提升至 95%" --mode now`
+4. **保持原有目录结构**
+
+---
+
+## 完成通知
+
+完成后运行：
+```
+C:\Users\Administrator\AppData\Roaming\npm\openclaw.cmd system event --text "Done: 地图瓦片集/UI素材/战斗特效资源集成 - 美术资源进度提升至 60%" --mode now
+```
