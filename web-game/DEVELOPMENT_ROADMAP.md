@@ -152,11 +152,11 @@
 
 ---
 
-**最近更新：** 2026-03-08 09:45
+**最近更新：** 2026-03-08 10:02
 **本次心跳完成：**
-- ✅ scripts/deploy.sh - 一键部署脚本（构建、启动、停止命令）
-- ✅ PerformanceMonitor.ts - 性能监控面板增强（FPS/内存/网络延迟、调试面板、数据导出）
-- ✅ AudioManager.ts - 音频资源加载器完善（BGM/SFX控制、设置持久化、Web Audio API）
+- ✅ BotAI.ts - 机器人 AI 优化（4 种性格策略、决策树、队伍搭配、学习型 AI）
+- ✅ SpectatorSystem.ts - 观战系统增强（回放功能、聊天室、精彩时刻、统计面板）
+- ✅ FeishuIntegration.ts - 飞书深度集成（消息卡片、群聊指令、OAuth 登录、日历提醒）
 
 ---
 
