@@ -1,6 +1,6 @@
 /**
  * 性能监控器
- * 负责监控游戏运行时的性能指标，包括帧率、帧时间、内存使用等
+ * 负责监控游戏运行时的性能指标，包括帧率、帧时间、内存使用、网络延迟等
  */
 
 /**
@@ -45,6 +45,18 @@ export interface PerformanceStats {
 
     /** 总时间 (毫秒) */
     totalTime: number;
+
+    /** 网络延迟 (毫秒) */
+    networkLatency: number;
+
+    /** 平均网络延迟 (毫秒) */
+    avgNetworkLatency: number;
+
+    /** 网络延迟历史记录 */
+    networkLatencyHistory: number[];
+
+    /** 网络状态 */
+    networkStatus: 'online' | 'offline' | 'unknown';
 }
 
 /**
@@ -129,6 +141,10 @@ export class PerformanceMonitor {
         updateTime: 0,
         renderTime: 0,
         totalTime: 0,
+        networkLatency: 0,
+        avgNetworkLatency: 0,
+        networkLatencyHistory: [],
+        networkStatus: 'unknown',
     };
 
     /** 帧时间历史记录 */
@@ -170,6 +186,15 @@ export class PerformanceMonitor {
     /** 优化建议列表 */
     private optimizationSuggestions: string[] = [];
 
+    /** 网络延迟监控间隔（毫秒） */
+    private networkPingInterval: number = 5000;
+
+    /** Ping 测试 URL */
+    private pingUrl: string = window.location.origin;
+
+    /** 网络监控定时器 ID */
+    private networkMonitorTimer: number | null = null;
+
     /**
      * 私有构造函数，确保单例
      */
@@ -196,6 +221,7 @@ export class PerformanceMonitor {
 
         this.enabled = true;
         this.lastFrameTime = performance.now();
+        this.startNetworkMonitoring();
         console.log('[PerformanceMonitor] 性能监控器已初始化', this.config);
     }
 
@@ -436,6 +462,10 @@ export class PerformanceMonitor {
             updateTime: 0,
             renderTime: 0,
             totalTime: 0,
+            networkLatency: 0,
+            avgNetworkLatency: 0,
+            networkLatencyHistory: [],
+            networkStatus: 'unknown',
         };
 
         this.frameTimeHistory = [];
@@ -461,6 +491,7 @@ export class PerformanceMonitor {
      */
     disable(): void {
         this.enabled = false;
+        this.stopNetworkMonitoring();
         console.log('[PerformanceMonitor] 性能监控已禁用');
     }
 
@@ -604,6 +635,15 @@ export class PerformanceMonitor {
                 <span style="margin-left: 8px;">${this.stats.activeObjects}</span>
             </div>
             <div style="margin-bottom: 8px;">
+                <span style="color: #888;">网络延迟:</span>
+                <span style="color: ${this.stats.networkStatus === 'online' ? '#0f0' : '#f00'}; margin-left: 8px;">${this.stats.networkLatency > 0 ? this.stats.networkLatency.toFixed(1) + 'ms' : '检测中'}</span>
+                <span style="color: #888; margin-left: 8px;">(平均: ${this.stats.avgNetworkLatency.toFixed(1)}ms)</span>
+            </div>
+            <div style="margin-bottom: 8px;">
+                <span style="color: #888;">网络状态:</span>
+                <span style="color: ${this.stats.networkStatus === 'online' ? '#0f0' : '#f00'}; margin-left: 8px;">${this.stats.networkStatus.toUpperCase()}</span>
+            </div>
+            <div style="margin-bottom: 8px;">
                 <span style="color: #888;">警告级别:</span>
                 <span style="color: ${warningColor}; margin-left: 8px;">${this.warningLevel.toUpperCase()}</span>
             </div>
@@ -614,7 +654,7 @@ export class PerformanceMonitor {
                 </div>
             ` : ''}
             <div style="margin-top: 10px; padding-top: 10px; border-top: 1px solid #333; color: #888;">
-                按 F3 键关闭面板
+                按 F2 键关闭面板 | 按 E 键导出数据
             </div>
         `;
 
@@ -633,6 +673,8 @@ export class PerformanceMonitor {
 更新时间: ${stats.updateTime.toFixed(2)}ms
 渲染时间: ${stats.renderTime.toFixed(2)}ms
 内存使用: ${stats.memoryUsage.toFixed(1)} MB (峰值: ${stats.memoryPeak.toFixed(1)} MB)
+网络延迟: ${stats.networkLatency.toFixed(1)}ms (平均: ${stats.avgNetworkLatency.toFixed(1)}ms)
+网络状态: ${stats.networkStatus.toUpperCase()}
 渲染对象: ${stats.renderCount}
 活跃对象: ${stats.activeObjects}
 警告级别: ${this.warningLevel.toUpperCase()}
@@ -640,9 +682,190 @@ export class PerformanceMonitor {
     }
 
     /**
+     * 启动网络延迟监控
+     */
+    private startNetworkMonitoring(): void {
+        // 清除现有定时器
+        if (this.networkMonitorTimer !== null) {
+            clearInterval(this.networkMonitorTimer);
+        }
+
+        // 立即执行一次
+        this.pingNetwork();
+
+        // 设置定时监控
+        this.networkMonitorTimer = window.setInterval(() => {
+            this.pingNetwork();
+        }, this.networkPingInterval);
+
+        console.log('[PerformanceMonitor] 网络延迟监控已启动');
+    }
+
+    /**
+     * 停止网络延迟监控
+     */
+    private stopNetworkMonitoring(): void {
+        if (this.networkMonitorTimer !== null) {
+            clearInterval(this.networkMonitorTimer);
+            this.networkMonitorTimer = null;
+            console.log('[PerformanceMonitor] 网络延迟监控已停止');
+        }
+    }
+
+    /**
+     * 执行网络延迟测试（Ping）
+     */
+    private async pingNetwork(): Promise<void> {
+        const startTime = performance.now();
+
+        try {
+            // 使用 HEAD 请求减少数据传输
+            await fetch(this.pingUrl, {
+                method: 'HEAD',
+                cache: 'no-cache',
+                mode: 'cors',
+            });
+
+            const endTime = performance.now();
+            const latency = endTime - startTime;
+
+            // 更新网络延迟
+            this.stats.networkLatency = latency;
+            this.stats.networkLatencyHistory.push(latency);
+
+            // 限制历史记录大小
+            if (this.stats.networkLatencyHistory.length > this.config.frameTimeWindow) {
+                this.stats.networkLatencyHistory.shift();
+            }
+
+            // 计算平均延迟
+            this.stats.avgNetworkLatency = this.stats.networkLatencyHistory.reduce((a, b) => a + b, 0) / this.stats.networkLatencyHistory.length;
+
+            // 更新网络状态
+            this.stats.networkStatus = 'online';
+        } catch (error) {
+            // 网络请求失败
+            this.stats.networkStatus = 'offline';
+            this.stats.networkLatency = -1;
+            console.warn('[PerformanceMonitor] 网络延迟测试失败:', error);
+        }
+    }
+
+    /**
+     * 设置 Ping 测试 URL
+     * @param url 测试 URL
+     */
+    setPingUrl(url: string): void {
+        this.pingUrl = url;
+        console.log(`[PerformanceMonitor] Ping URL 设置为: ${url}`);
+    }
+
+    /**
+     * 获取网络延迟
+     * @returns 网络延迟（毫秒），-1 表示离线
+     */
+    getNetworkLatency(): number {
+        return this.stats.networkLatency;
+    }
+
+    /**
+     * 获取平均网络延迟
+     * @returns 平均网络延迟（毫秒）
+     */
+    getAvgNetworkLatency(): number {
+        return this.stats.avgNetworkLatency;
+    }
+
+    /**
+     * 获取网络状态
+     * @returns 网络状态
+     */
+    getNetworkStatus(): 'online' | 'offline' | 'unknown' {
+        return this.stats.networkStatus;
+    }
+
+    /**
+     * 获取网络延迟历史
+     * @returns 网络延迟历史记录
+     */
+    getNetworkLatencyHistory(): number[] {
+        return [...this.stats.networkLatencyHistory];
+    }
+
+    /**
+     * 设置网络监控间隔
+     * @param interval 监控间隔（毫秒）
+     */
+    setNetworkPingInterval(interval: number): void {
+        this.networkPingInterval = interval;
+        // 重启监控以应用新间隔
+        if (this.enabled) {
+            this.startNetworkMonitoring();
+        }
+    }
+
+    /**
+     * 导出性能数据为 JSON
+     * @returns JSON 字符串
+     */
+    exportData(): string {
+        const exportData = {
+            timestamp: new Date().toISOString(),
+            stats: this.getStats(),
+            warningLevel: this.getWarningLevel(),
+            fpsHistory: this.getFpsHistory(),
+            frameTimeHistory: this.getFrameTimeHistory(),
+            memoryHistory: this.getMemoryHistory(),
+            networkLatencyHistory: this.getNetworkLatencyHistory(),
+            optimizationSuggestions: this.getOptimizationSuggestions(),
+            config: this.config,
+        };
+
+        return JSON.stringify(exportData, null, 2);
+    }
+
+    /**
+     * 导出性能数据并下载为文件
+     * @param filename 文件名（默认: performance-data.json）
+     */
+    downloadData(filename: string = 'performance-data.json'): void {
+        const jsonData = this.exportData();
+        const blob = new Blob([jsonData], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+
+        URL.revokeObjectURL(url);
+
+        console.log(`[PerformanceMonitor] 性能数据已导出: ${filename}`);
+    }
+
+    /**
+     * 从 JSON 导入性能数据
+     * @param jsonData JSON 字符串
+     * @returns 导入的数据对象
+     */
+    importData(jsonData: string): any {
+        try {
+            const data = JSON.parse(jsonData);
+            console.log('[PerformanceMonitor] 性能数据已导入');
+            return data;
+        } catch (error) {
+            console.error('[PerformanceMonitor] 导入性能数据失败:', error);
+            throw error;
+        }
+    }
+
+    /**
      * 销毁性能监控器
      */
     destroy(): void {
+        this.stopNetworkMonitoring();
         this.hideDebugPanel();
         this.enabled = false;
         this.resetStats();

@@ -5,6 +5,8 @@
  * - BGM（背景音乐）播放、循环、切换、淡入淡出
  * - 音效播放（技能、脚步、UI等）
  * - 音量控制和静音功能
+ * - 音频设置持久化（localStorage）
+ * - Web Audio API 音频上下文管理
  */
 
 /**
@@ -64,6 +66,18 @@ interface SFXInfo {
 }
 
 /**
+ * 音频设置接口
+ */
+export interface AudioSettings {
+  /** BGM 音量 (0-1) */
+  bgmVolume: number;
+  /** 音效音量 (0-1) */
+  sfxVolume: number;
+  /** 是否静音 */
+  muted: boolean;
+}
+
+/**
  * 音频管理器配置
  */
 export interface AudioManagerConfig {
@@ -75,6 +89,10 @@ export interface AudioManagerConfig {
   fadeDuration: number;
   /** 同时播放的最大音效数 */
   maxConcurrentSFX: number;
+  /** 是否启用设置持久化 */
+  enablePersistence: boolean;
+  /** localStorage 存储键名 */
+  storageKey: string;
 }
 
 /**
@@ -113,8 +131,14 @@ export class AudioManager {
   /** 预加载的 BGM 缓存 */
   private bgmCache: Map<string, HTMLAudioElement> = new Map();
 
-  /** 上次更新时间 */
-  // private lastUpdateTime: number = 0;
+  /** 配置 */
+  private config: AudioManagerConfig;
+
+  /** Web Audio API 上下文 */
+  private audioContext: AudioContext | null = null;
+
+  /** 音频上下文是否已初始化 */
+  private audioContextInitialized: boolean = false;
 
   /**
    * 私有构造函数，确保单例
@@ -124,10 +148,24 @@ export class AudioManager {
     defaultSFXVolume: 0.8,
     fadeDuration: 1000,
     maxConcurrentSFX: 10,
+    enablePersistence: true,
+    storageKey: 'openclaw-audio-settings',
   }) {
-    this.bgmVolume = config.defaultBGMVolume;
-    this.sfxVolume = config.defaultSFXVolume;
-    this.muted = false;
+    this.config = config;
+
+    // 尝试从 localStorage 加载设置
+    const savedSettings = this.loadSettings();
+    if (savedSettings) {
+      this.bgmVolume = savedSettings.bgmVolume;
+      this.sfxVolume = savedSettings.sfxVolume;
+      this.muted = savedSettings.muted;
+      console.log('[AudioManager] 从 localStorage 加载音频设置');
+    } else {
+      this.bgmVolume = config.defaultBGMVolume;
+      this.sfxVolume = config.defaultSFXVolume;
+      this.muted = false;
+    }
+
     this.fadeDuration = config.fadeDuration;
     this.maxConcurrentSFX = config.maxConcurrentSFX;
   }
@@ -148,19 +186,148 @@ export class AudioManager {
   async initialize(): Promise<void> {
     console.log('[AudioManager] Initializing...');
 
-    // 尝试解锁音频上下文（浏览器需要用户交互才能播放音频）
-    try {
-      if (typeof (window as any).AudioContext !== 'undefined') {
-        const audioContext = new (window as any).AudioContext();
-        if (audioContext.state === 'suspended') {
-          await audioContext.resume();
-        }
-      }
-    } catch (e) {
-      console.warn('[AudioManager] AudioContext setup failed:', e);
-    }
+    // 初始化 Web Audio API 上下文
+    await this.initAudioContext();
 
     console.log('[AudioManager] Initialized');
+  }
+
+  /**
+   * 初始化 Web Audio API 上下文
+   */
+  async initAudioContext(): Promise<void> {
+    if (this.audioContextInitialized) {
+      return;
+    }
+
+    try {
+      // 创建 AudioContext
+      const AudioContextClass = (window as any).AudioContext || (window as any).webkitAudioContext;
+      if (!AudioContextClass) {
+        console.warn('[AudioManager] Web Audio API 不支持');
+        return;
+      }
+
+      this.audioContext = new AudioContextClass();
+
+      // 尝试恢复音频上下文（浏览器需要用户交互才能播放音频）
+      if (this.audioContext && this.audioContext.state === 'suspended') {
+        await this.audioContext.resume();
+      }
+
+      this.audioContextInitialized = true;
+      console.log('[AudioManager] Web Audio API 上下文已初始化');
+    } catch (e) {
+      console.error('[AudioManager] Web Audio API 初始化失败:', e);
+    }
+  }
+
+  /**
+   * 获取音频上下文
+   */
+  getAudioContext(): AudioContext | null {
+    return this.audioContext;
+  }
+
+  /**
+   * 确保 Web Audio API 上下文已恢复
+   */
+  async ensureAudioContextResumed(): Promise<void> {
+    if (this.audioContext && this.audioContext.state === 'suspended') {
+      await this.audioContext.resume();
+      console.log('[AudioManager] 音频上下文已恢复');
+    }
+  }
+
+  /**
+   * 从 localStorage 加载音频设置
+   */
+  private loadSettings(): AudioSettings | null {
+    if (!this.config.enablePersistence) {
+      return null;
+    }
+
+    try {
+      const data = localStorage.getItem(this.config.storageKey);
+      if (data) {
+        return JSON.parse(data) as AudioSettings;
+      }
+    } catch (e) {
+      console.warn('[AudioManager] 加载音频设置失败:', e);
+    }
+
+    return null;
+  }
+
+  /**
+   * 保存音频设置到 localStorage
+   */
+  private saveSettings(): void {
+    if (!this.config.enablePersistence) {
+      return;
+    }
+
+    try {
+      const settings: AudioSettings = {
+        bgmVolume: this.bgmVolume,
+        sfxVolume: this.sfxVolume,
+        muted: this.muted,
+      };
+
+      localStorage.setItem(this.config.storageKey, JSON.stringify(settings));
+      console.log('[AudioManager] 音频设置已保存');
+    } catch (e) {
+      console.warn('[AudioManager] 保存音频设置失败:', e);
+    }
+  }
+
+  /**
+   * 获取当前音频设置
+   */
+  getSettings(): AudioSettings {
+    return {
+      bgmVolume: this.bgmVolume,
+      sfxVolume: this.sfxVolume,
+      muted: this.muted,
+    };
+  }
+
+  /**
+   * 设置音频设置
+   */
+  setSettings(settings: Partial<AudioSettings>): void {
+    if (settings.bgmVolume !== undefined) {
+      this.setBGMVolume(settings.bgmVolume);
+    }
+    if (settings.sfxVolume !== undefined) {
+      this.setSFXVolume(settings.sfxVolume);
+    }
+    if (settings.muted !== undefined) {
+      this.setMuted(settings.muted);
+    }
+
+    this.saveSettings();
+  }
+
+  /**
+   * 重置音频设置为默认值
+   */
+  resetSettings(): void {
+    this.bgmVolume = this.config.defaultBGMVolume;
+    this.sfxVolume = this.config.defaultSFXVolume;
+    this.muted = false;
+
+    // 更新当前播放的音频音量
+    if (this.currentBGM && this.currentBGM.state === BGMState.PLAYING) {
+      this.currentBGM.element.volume = this.getActualVolume(this.bgmVolume);
+    }
+
+    for (const sfx of this.playingSFX) {
+      sfx.element.volume = this.getActualVolume(this.sfxVolume);
+    }
+
+    this.saveSettings();
+    console.log('[AudioManager] 音频设置已重置');
   }
 
   /**
@@ -176,6 +343,9 @@ export class AudioManager {
     fadeIn: boolean = true,
     volume?: number
   ): Promise<void> {
+    // 确保 Web Audio API 上下文已恢复
+    await this.ensureAudioContextResumed();
+
     // 如果已经是同一首 BGM，不重新播放
     if (this.currentBGM && this.currentBGM.id === id) {
       return;
@@ -196,7 +366,7 @@ export class AudioManager {
         console.error(`[AudioManager] Failed to load BGM: ${id}`);
         return;
       }
-      this.bgmCache.set(id, audioElement!);
+      this.bgmCache.set(id, audioElement);
     }
 
     // 重置播放位置
@@ -258,11 +428,18 @@ export class AudioManager {
   /**
    * 恢复 BGM
    */
-  resumeBGM(): void {
+  async resumeBGM(): Promise<void> {
     if (!this.currentBGM) return;
 
-    this.currentBGM.element.play();
-    console.log('[AudioManager] BGM resumed');
+    // 确保 Web Audio API 上下文已恢复
+    await this.ensureAudioContextResumed();
+
+    try {
+      await this.currentBGM.element.play();
+      console.log('[AudioManager] BGM resumed');
+    } catch (e) {
+      console.error('[AudioManager] Failed to resume BGM:', e);
+    }
   }
 
   /**
@@ -284,6 +461,9 @@ export class AudioManager {
     if (this.currentBGM && this.currentBGM.state === BGMState.PLAYING) {
       this.currentBGM.element.volume = this.getActualVolume(this.bgmVolume);
     }
+
+    // 保存设置
+    this.saveSettings();
   }
 
   /**
@@ -300,6 +480,9 @@ export class AudioManager {
    * @param pitch 音调（倍率，默认1.0）
    */
   async playSFX(id: string, volume?: number, pitch: number = 1.0): Promise<void> {
+    // 确保 Web Audio API 上下文已恢复
+    await this.ensureAudioContextResumed();
+
     // 检查并发音效数量限制
     if (this.playingSFX.length >= this.maxConcurrentSFX) {
       console.warn('[AudioManager] Max concurrent SFX reached, skipping:', id);
@@ -314,7 +497,7 @@ export class AudioManager {
         console.error(`[AudioManager] Failed to load SFX: ${id}`);
         return;
       }
-      this.sfxCache.set(id, audioElement!);
+      this.sfxCache.set(id, audioElement);
     }
 
     // 克隆音频元素以支持同时播放多次
@@ -381,6 +564,9 @@ export class AudioManager {
     for (const sfx of this.playingSFX) {
       sfx.element.volume = this.getActualVolume(this.sfxVolume);
     }
+
+    // 保存设置
+    this.saveSettings();
   }
 
   /**
@@ -388,6 +574,23 @@ export class AudioManager {
    */
   getSFXVolume(): number {
     return this.sfxVolume;
+  }
+
+  /**
+   * 设置主音量（同时设置 BGM 和 SFX）
+   * @param volume 音量 (0-1)
+   */
+  setMasterVolume(volume: number): void {
+    const clampedVolume = Math.max(0, Math.min(1, volume));
+    this.setBGMVolume(clampedVolume);
+    this.setSFXVolume(clampedVolume);
+  }
+
+  /**
+   * 获取主音量（取 BGM 和 SFX 的平均值）
+   */
+  getMasterVolume(): number {
+    return (this.bgmVolume + this.sfxVolume) / 2;
   }
 
   /**
@@ -407,6 +610,9 @@ export class AudioManager {
     for (const sfx of this.playingSFX) {
       sfx.element.volume = this.getActualVolume(this.sfxVolume);
     }
+
+    // 保存设置
+    this.saveSettings();
   }
 
   /**
@@ -434,7 +640,7 @@ export class AudioManager {
 
     const audioElement = await this.loadBGM(id);
     if (audioElement) {
-      this.bgmCache.set(id, audioElement!);
+      this.bgmCache.set(id, audioElement);
     }
   }
 
@@ -449,7 +655,7 @@ export class AudioManager {
 
     const audioElement = await this.loadSFX(id);
     if (audioElement) {
-      this.sfxCache.set(id, audioElement!);
+      this.sfxCache.set(id, audioElement);
     }
   }
 
@@ -495,8 +701,6 @@ export class AudioManager {
    * 更新音频管理器（处理淡入/淡出）
    */
   update(deltaTime: number): void {
-    // lastUpdateTime removed
-
     // 更新 BGM 淡入/淡出
     if (this.currentBGM) {
       this.updateBGMFade(deltaTime);
@@ -635,6 +839,26 @@ export class AudioManager {
         resolve(undefined);
       }, 10000);
     });
+  }
+
+  /**
+   * 销毁音频管理器
+   */
+  destroy(): void {
+    // 停止所有音频
+    this.stopBGM(false);
+    this.stopAllSFX();
+
+    // 清除缓存
+    this.clearCache();
+
+    // 关闭 Web Audio API 上下文
+    if (this.audioContext) {
+      this.audioContext.close();
+      this.audioContext = null;
+    }
+
+    console.log('[AudioManager] 已销毁');
   }
 }
 

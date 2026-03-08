@@ -1,67 +1,63 @@
-# OpenClaw MMO - 开发任务（2026-03-08 08:48）
+# OpenClaw MMO - 开发任务（2026-03-08 09:35）
 
 ## 📋 任务列表
 
-### 任务 1: 道具资源完整加载 - P0
+### 任务 1: 云服务器部署配置 - P3
 
-**目标**: 实现 221 个道具资源的完整加载和使用
+**目标**: 准备云服务器部署所需的配置和脚本
 
 **具体任务**:
-- [ ] 复制 Tuxemon 道具资源到 assets/tuxemon/items/
-- [ ] 增强 ItemDataLoader 支持 221 个道具
-- [ ] 实现道具分类（恢复、捕捉、进化、装备等）
-- [ ] 实现道具使用效果
-- [ ] 实现战斗中道具使用
-- [ ] 实现背包 UI 显示道具图标
+- [ ] 创建 `Dockerfile` 容器化配置
+- [ ] 创建 `docker-compose.yml` 编排配置（web-game + websocket-server）
+- [ ] 创建 `nginx.conf` 反向代理配置（支持 WebSocket）
+- [ ] 创建 `scripts/deploy.sh` 一键部署脚本
+- [ ] 创建环境变量配置模板 `.env.example`
+- [ ] 编写部署文档 `DEPLOYMENT.md`
 
-**参考**: Tuxemon 的 `item.py` 道具系统
-
-**验收标准**:
-- 所有 221 个道具可加载
-- 道具图标正确显示
-- 道具效果正确触发
+**技术要求**:
+- 使用 Node.js Alpine 镜像
+- nginx 需要支持 WebSocket 代理
+- 部署脚本需要包含构建、启动、停止命令
 
 ---
 
-### 任务 2: 音乐/音效资源加载 - P0
+### 任务 2: 游戏性能监控面板 - P3
 
-**目标**: 实现游戏音乐和音效系统
+**目标**: 实现游戏内性能监控和调试面板
 
 **具体任务**:
-- [ ] 复制 Tuxemon 音乐资源到 assets/tuxemon/music/
-- [ ] 复制 Tuxemon 音效资源到 assets/tuxemon/sounds/
-- [ ] 创建 AudioManager.ts 音频管理器
-- [ ] 实现 BGM 播放控制（循环、切换、淡入淡出）
-- [ ] 实现音效播放（技能、脚步、UI）
-- [ ] 实现音量控制和静音功能
+- [ ] 创建 `src/engine/PerformanceMonitor.ts` 性能监控器
+- [ ] 实现 FPS 实时监控（使用 performance.now()）
+- [ ] 实现内存使用监控（如果浏览器支持）
+- [ ] 实现网络延迟监控（ping 测试）
+- [ ] 创建调试面板 UI（Canvas 绘制，可开关）
+- [ ] 实现性能数据导出功能（JSON 格式）
+- [ ] 添加性能警告阈值配置
 
-**参考**: Tuxemon 的音频系统
-
-**验收标准**:
-- BGM 正确播放和切换
-- 音效正确触发
-- 音量控制正常
+**技术要求**:
+- 使用 requestAnimationFrame 计算 FPS
+- 使用 navigator.memory API（如果可用）
+- 调试面板通过 F2 键开关
 
 ---
 
-### 任务 3: 游戏启动器/主菜单系统 - P1
+### 任务 3: 音频资源加载器完善 - P2
 
-**目标**: 实现完整的游戏启动流程和主菜单
+**目标**: 实现完整的音频资源加载和播放系统
 
 **具体任务**:
-- [ ] 创建 MainMenu.ts 主菜单组件
-- [ ] 实现"开始游戏"→存档选择流程
-- [ ] 实现"继续游戏"→加载存档
-- [ ] 实现"设置"→音量、控制设置
-- [ ] 实现标题画面（Logo + BGM）
-- [ ] 实现存档选择界面
+- [ ] 创建 `src/engine/AudioManager.ts` 音频管理器
+- [ ] 实现 BGM 播放控制（播放/暂停/切换/淡入淡出）
+- [ ] 实现音效播放控制（多通道、优先级队列）
+- [ ] 实现音频资源预加载（从 assets/tuxemon/music 和 sounds）
+- [ ] 添加音频设置持久化（localStorage 保存音量、静音状态）
+- [ ] 实现 Web Audio API 音频上下文管理
+- [ ] 添加音量控制接口（主音量、BGM 音量、SFX 音量）
 
-**参考**: Tuxemon 的主菜单系统
-
-**验收标准**:
-- 主菜单正确显示
-- 存档选择功能正常
-- 设置保存正常
+**技术要求**:
+- 使用 Web Audio API
+- 支持 OGG/MP3/WAV 格式
+- 音效需要支持同时播放多个（多通道）
 
 ---
 
@@ -93,10 +89,10 @@
 完成后运行：
 
 ```bash
-C:\Users\Administrator\AppData\Roaming\npm\openclaw.cmd system event --text "Done: 道具资源完整加载、音乐/音效资源加载、游戏启动器/主菜单系统 - 美术资源提升至 50%" --mode now
+C:\Users\Administrator\AppData\Roaming\npm\openclaw.cmd system event --text "Done: 云服务器部署配置、性能监控面板、音频资源加载器 - Week 10 达到 100%" --mode now
 ```
 
 ---
 
-**创建时间**: 2026-03-08 08:48
-**优先级**: P0 (资源) + P1 (启动系统)
+**创建时间**: 2026-03-08 09:35
+**优先级**: P2/P3（系统完善 + 部署配置）
