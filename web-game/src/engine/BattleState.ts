@@ -130,6 +130,10 @@ export interface BattleEvent {
   itemId?: string;
   /** 事件文本 */
   text?: string;
+  /** 是否暴击 */
+  isCritical?: boolean;
+  /** 效果倍率（用于计算效果拔群/效果不佳） */
+  effective?: number;
 }
 
 /**

@@ -8,7 +8,7 @@
  * - 伤害数字飘字效果（上升、渐隐）
  * - 状态效果动画（状态图标闪烁）
  * - 战斗场景过渡动画（进入/退出战斗）
- * - 攻击特效（怪物闪烁、屏幕震动）
+ * - 攻击特效（怪物闪烁、屏幕震动、顿帧、hitstop）
  */
 
 import {
@@ -48,6 +48,26 @@ export enum AnimationType {
   MONSTER_DISAPPEAR = 'monster_disappear',
   /** 升级动画 */
   LEVEL_UP = 'level_up',
+  /** 顿帧（hitstop）- 打击感效果 */
+  HITSTOP = 'hitstop',
+  /** 攻击动画 - 攻击者向前冲 */
+  ATTACK_LUNGE = 'attack_lunge',
+  /** 受击动画 - 受击者向后退 */
+  HIT_RECOIL = 'hit_recoil',
+  /** 连击数显示 */
+  COMBO_COUNT = 'combo_count',
+  /** 暴击特效 */
+  CRITICAL_HIT = 'critical_hit',
+  /** 状态持续效果（中毒、灼烧等） */
+  STATUS_EFFECT = 'status_effect',
+  /** 属性伤害特效 */
+  ELEMENTAL_DAMAGE = 'elemental_damage',
+  /** 技能光波 */
+  SKILL_WAVE = 'skill_wave',
+  /** 防御护盾 */
+  SHIELD_BREAK = 'shield_break',
+  /** 必杀技动画 */
+  ULTIMATE = 'ultimate',
 }
 
 /**
@@ -68,6 +88,10 @@ export enum FloatColor {
   STATUS = 'status',
   /** 经验值（黄色） */
   EXP = 'exp',
+  /** 吸血效果（青色） */
+  DRAIN = 'drain',
+  /** 反弹伤害（灰色） */
+  REFLECT = 'reflect',
 }
 
 /**
@@ -108,6 +132,10 @@ export interface DamageFloatConfig {
   riseDistance?: number;
   /** 持续时间（毫秒） */
   duration?: number;
+  /** 是否暴击 */
+  isCritical?: boolean;
+  /** 字体大小 */
+  fontSize?: number;
 }
 
 /**
@@ -122,6 +150,8 @@ export interface StatusAnimationConfig {
   targetId: string;
   /** 状态图标路径 */
   iconPath?: string;
+  /** 状态持续时间（回合） */
+  duration?: number;
 }
 
 /**
@@ -134,6 +164,94 @@ export interface ShakeConfig {
   count: number;
   /** 震动持续时间（毫秒） */
   duration?: number;
+  /** 震动方向（'both' | 'x' | 'y'） */
+  direction?: 'both' | 'x' | 'y';
+}
+
+/**
+ * 顿帧配置（hitstop）
+ */
+export interface HitstopConfig {
+  /** 顿帧持续时间（毫秒） */
+  duration: number;
+  /** 是否完全冻结画面 */
+  freezeAll?: boolean;
+}
+
+/**
+ * 攻击冲刺配置
+ */
+export interface LungeConfig {
+  /** 目标单位 ID */
+  targetId: string;
+  /** 源单位 ID */
+  sourceId: string;
+  /** 冲刺距离 */
+  distance: number;
+  /** 冲刺持续时间（毫秒） */
+  duration: number;
+}
+
+/**
+ * 受击后退配置
+ */
+export interface RecoilConfig {
+  /** 目标单位 ID */
+  targetId: string;
+  /** 后退距离 */
+  distance: number;
+  /** 后退持续时间（毫秒） */
+  duration: number;
+}
+
+/**
+ * 连击数配置
+ */
+export interface ComboConfig {
+  /** 连击数 */
+  count: number;
+  /** 最大连击数（用于计算颜色） */
+  maxCount: number;
+  /** 目标单位 ID */
+  targetId: string;
+  /** 位置 */
+  x: number;
+  y: number;
+}
+
+/**
+ * 属性伤害特效配置
+ */
+export interface ElementalDamageConfig {
+  /** 目标单位 ID */
+  targetId: string;
+  /** 元素类型 */
+  element: string;
+  /** 伤害值 */
+  damage: number;
+  /** 位置 */
+  x: number;
+  y: number;
+}
+
+/**
+ * 技能光波配置
+ */
+export interface SkillWaveConfig {
+  /** 起始位置 */
+  startX: number;
+  /** 起始 Y */
+  startY: number;
+  /** 目标 X */
+  targetX: number;
+  /** 目标 Y */
+  targetY: number;
+  /** 光波颜色 */
+  color: string;
+  /** 光波宽度 */
+  width: number;
+  /** 光波持续时间（毫秒） */
+  duration: number;
 }
 
 /**
@@ -155,6 +273,16 @@ export interface AnimationInstance {
   completed: boolean;
   /** 回调函数 */
   callback?: AnimationCallback;
+  /** 当前进度（0-1） */
+  progress: number;
+}
+
+/**
+ * 屏幕偏移（用于震动效果）
+ */
+interface ScreenOffset {
+  x: number;
+  y: number;
 }
 
 /**
@@ -183,6 +311,20 @@ export class BattleAnimationManager {
 
   /** 音效管理器引用 */
   private soundManager: BattleSoundManager | null = null;
+
+  /** 屏幕偏移（用于震动） */
+  private screenOffset: ScreenOffset = { x: 0, y: 0 };
+
+  /** 顿帧状态 */
+  private hitstopActive: boolean = false;
+  private hitstopEndTime: number = 0;
+
+  /** 当前连击数 */
+  private currentCombo: number = 0;
+  private comboTimer: number | null = null;
+
+  /** 状态效果映射（用于持续状态动画） */
+  private statusEffects: Map<string, { statusId: StatusEffectId; startTime: number }[]> = new Map();
 
   /**
    * 私有构造函数，确保单例
@@ -252,16 +394,31 @@ export class BattleAnimationManager {
     switch (event.type) {
       case 'damage':
         if (event.value !== undefined && event.targetId) {
+          const color = this.getDamageColor(event, event.value);
+
           this.playDamageFloat(
             event.targetId,
             event.value,
-            event.sourceId !== undefined ? FloatColor.DAMAGE_NORMAL : FloatColor.DAMAGE_SUPER
+            color,
+            event.isCritical
           );
           this.playMonsterFlash(event.targetId);
+          this.playHitRecoil(event.targetId);
+
+          // 暴击时播放额外特效
+          if (event.isCritical) {
+            this.playCriticalHit(event.targetId);
+            this.playHitstop(80); // 暴击顿帧时间更长
+          } else {
+            this.playHitstop(40); // 普通攻击顿帧
+          }
+
+          // 增加连击数
+          this.incrementCombo();
 
           // 播放伤害音效
           if (this.soundManager) {
-            this.soundManager.playDamageSound(event.value, false);
+            this.soundManager.playDamageSound(event.value, event.isCritical || false);
           }
         }
         break;
@@ -280,6 +437,7 @@ export class BattleAnimationManager {
       case 'status_apply':
         if (event.statusId && event.targetId) {
           this.playStatusApply(event.statusId as StatusEffectId, event.targetId);
+          this.playStatusEffect(event.statusId as StatusEffectId, event.targetId);
 
           // 播放状态音效
           if (this.soundManager) {
@@ -291,6 +449,7 @@ export class BattleAnimationManager {
       case 'faint':
         if (event.targetId) {
           this.playMonsterDisappear(event.targetId);
+          this.resetCombo(); // 怪物倒下时重置连击
 
           // 播放怪物倒下音效
           if (this.soundManager) {
@@ -319,6 +478,22 @@ export class BattleAnimationManager {
   }
 
   /**
+   * 获取伤害颜色类型
+   */
+  private getDamageColor(event: BattleEvent, _value: number): FloatColor {
+    if (event.isCritical) {
+      return FloatColor.DAMAGE_CRITICAL;
+    }
+    if (event.effective !== undefined && event.effective > 1.5) {
+      return FloatColor.DAMAGE_SUPER;
+    }
+    if (event.effective !== undefined && event.effective < 0.7) {
+      return FloatColor.DAMAGE_WEAK;
+    }
+    return FloatColor.DAMAGE_NORMAL;
+  }
+
+  /**
    * 播放技能动画
    *
    * @param technique 技能数据
@@ -332,16 +507,21 @@ export class BattleAnimationManager {
   ): string {
     const animationId = this.generateAnimationId();
 
+    // 根据技能威力决定动画类型
+    const isUltimate = technique.power >= 90;
+    const duration = isUltimate ? 1500 : 800;
+
     const config: AnimationConfig = {
-      type: AnimationType.TECHNIQUE,
+      type: isUltimate ? AnimationType.ULTIMATE : AnimationType.TECHNIQUE,
       sourceId,
       targetIds: targetIds as any,
       techniqueId: technique.slug,
-      duration: 500,
+      duration,
       params: {
         element: technique.element,
         power: technique.power,
         animation: technique.animation,
+        isUltimate,
       },
     };
 
@@ -350,10 +530,20 @@ export class BattleAnimationManager {
       config,
       startTime: Date.now(),
       completed: false,
+      progress: 0,
     };
 
     this.animationQueue.push(instance);
-    console.log(`[BattleAnimationManager] Queued technique animation: ${technique.name}`);
+
+    // 播放攻击冲刺动画
+    if (targetIds.length > 0) {
+      this.playAttackLunge(sourceId, targetIds[0]);
+    }
+
+    // 必杀技时播放屏幕震动
+    if (isUltimate) {
+      this.playScreenShake(8, 4);
+    }
 
     // 播放技能音效
     if (this.soundManager) {
@@ -361,7 +551,44 @@ export class BattleAnimationManager {
       this.soundManager.playTechniqueSound(technique.slug, element, technique.power);
     }
 
+    // 播放技能光波
+    if (targetIds.length > 0) {
+      const sourcePos = this.unitPositions.get(sourceId);
+      const targetPos = this.unitPositions.get(targetIds[0]);
+      if (sourcePos && targetPos) {
+        this.playSkillWave(
+          sourcePos.x + 48, sourcePos.y + 48,
+          targetPos.x + 48, targetPos.y + 48,
+          this.getElementColor(technique.element)
+        );
+      }
+    }
+
+    console.log(`[BattleAnimationManager] Queued technique animation: ${technique.name}`);
     return animationId;
+  }
+
+  /**
+   * 获取元素对应的颜色
+   */
+  private getElementColor(element?: string): string {
+    const colorMap: Record<string, string> = {
+      fire: '#FF4444',
+      water: '#4444FF',
+      grass: '#44FF44',
+      electric: '#FFFF44',
+      ice: '#88FFFF',
+      poison: '#AA44FF',
+      ground: '#AA7744',
+      flying: '#88AAFF',
+      psychic: '#FF88FF',
+      ghost: '#6644AA',
+      dragon: '#4444AA',
+      dark: '#444466',
+      steel: '#AAAAAA',
+      fairy: '#FFAAFF',
+    };
+    return element ? (colorMap[element.toLowerCase()] || '#FFFFFF') : '#FFFFFF';
   }
 
   /**
@@ -370,8 +597,9 @@ export class BattleAnimationManager {
    * @param targetId 目标单位 ID
    * @param value 伤害值
    * @param color 颜色类型
+   * @param isCritical 是否暴击
    */
-  playDamageFloat(targetId: string, value: number, color: FloatColor = FloatColor.DAMAGE_NORMAL): string {
+  playDamageFloat(targetId: string, value: number, color: FloatColor = FloatColor.DAMAGE_NORMAL, isCritical?: boolean): string {
     const position = this.unitPositions.get(targetId);
     if (!position) {
       console.warn(`[BattleAnimationManager] No position found for unit: ${targetId}`);
@@ -384,8 +612,10 @@ export class BattleAnimationManager {
       color,
       startX: position.x + 50,
       startY: position.y - 20,
-      riseDistance: 60,
-      duration: 800,
+      riseDistance: 80,
+      duration: 1000,
+      isCritical,
+      fontSize: isCritical ? 32 : 24,
     };
 
     const instance: AnimationInstance = {
@@ -398,6 +628,7 @@ export class BattleAnimationManager {
       },
       startTime: Date.now(),
       completed: false,
+      progress: 0,
     };
 
     this.animationQueue.push(instance);
@@ -427,11 +658,13 @@ export class BattleAnimationManager {
           color: FloatColor.HEAL,
           startX: position.x + 50,
           startY: position.y - 20,
-          riseDistance: 40,
+          riseDistance: 50,
+          fontSize: 24,
         },
       },
       startTime: Date.now(),
       completed: false,
+      progress: 0,
     };
 
     this.animationQueue.push(instance);
@@ -455,17 +688,19 @@ export class BattleAnimationManager {
       config: {
         type: AnimationType.HEAL_FLOAT,
         targetId,
-        duration: 1000,
+        duration: 1200,
         params: {
           value,
           color: FloatColor.EXP,
           startX: position.x,
           startY: position.y + 80,
-          riseDistance: 50,
+          riseDistance: 60,
+          fontSize: 20,
         },
       },
       startTime: Date.now(),
       completed: false,
+      progress: 0,
     };
 
     this.animationQueue.push(instance);
@@ -498,10 +733,70 @@ export class BattleAnimationManager {
       },
       startTime: Date.now(),
       completed: false,
+      progress: 0,
     };
 
     this.animationQueue.push(instance);
     return animationId;
+  }
+
+  /**
+   * 播放状态持续效果动画
+   *
+   * @param statusId 状态 ID
+   * @param targetId 目标单位 ID
+   */
+  playStatusEffect(statusId: StatusEffectId, targetId: string): string {
+    // 添加到状态效果映射
+    if (!this.statusEffects.has(targetId)) {
+      this.statusEffects.set(targetId, []);
+    }
+    this.statusEffects.get(targetId)!.push({
+      statusId,
+      startTime: Date.now(),
+    });
+
+    // 启动持续状态动画
+    const animationId = this.generateAnimationId();
+
+    const instance: AnimationInstance = {
+      id: animationId,
+      config: {
+        type: AnimationType.STATUS_EFFECT,
+        targetId,
+        duration: 5000, // 5秒持续效果
+        params: {
+          statusId,
+          statusName: this.getStatusName(statusId),
+        },
+      },
+      startTime: Date.now(),
+      completed: false,
+      progress: 0,
+    };
+
+    this.animationQueue.push(instance);
+    return animationId;
+  }
+
+  /**
+   * 移除单位的状态效果
+   *
+   * @param targetId 目标单位 ID
+   * @param statusId 状态 ID（可选，不指定则移除所有）
+   */
+  removeStatusEffect(targetId: string, statusId?: StatusEffectId): void {
+    if (!this.statusEffects.has(targetId)) return;
+
+    if (statusId) {
+      const effects = this.statusEffects.get(targetId)!;
+      const index = effects.findIndex(e => e.statusId === statusId);
+      if (index !== -1) {
+        effects.splice(index, 1);
+      }
+    } else {
+      this.statusEffects.delete(targetId);
+    }
   }
 
   /**
@@ -523,6 +818,7 @@ export class BattleAnimationManager {
       },
       startTime: Date.now(),
       completed: false,
+      progress: 0,
     };
 
     this.animationQueue.push(instance);
@@ -534,19 +830,228 @@ export class BattleAnimationManager {
    *
    * @param intensity 震动强度
    * @param count 震动次数
+   * @param direction 震动方向
    */
-  playScreenShake(intensity: number = 5, count: number = 3): string {
+  playScreenShake(intensity: number = 5, count: number = 3, direction: 'both' | 'x' | 'y' = 'both'): string {
     const animationId = this.generateAnimationId();
 
     const instance: AnimationInstance = {
       id: animationId,
       config: {
         type: AnimationType.SCREEN_SHAKE,
-        duration: count * 100,
-        params: { intensity, count, duration: 100 },
+        duration: count * 80,
+        params: { intensity, count, duration: 80, direction },
       },
       startTime: Date.now(),
       completed: false,
+      progress: 0,
+    };
+
+    this.animationQueue.push(instance);
+    return animationId;
+  }
+
+  /**
+   * 播放顿帧效果（hitstop）
+   *
+   * @param duration 顿帧持续时间（毫秒）
+   * @param freezeAll 是否完全冻结画面
+   */
+  playHitstop(duration: number, freezeAll: boolean = false): string {
+    const animationId = this.generateAnimationId();
+
+    this.hitstopActive = true;
+    this.hitstopEndTime = Date.now() + duration;
+
+    const instance: AnimationInstance = {
+      id: animationId,
+      config: {
+        type: AnimationType.HITSTOP,
+        duration,
+        params: { freezeAll },
+      },
+      startTime: Date.now(),
+      completed: false,
+      progress: 0,
+    };
+
+    this.animationQueue.push(instance);
+    return animationId;
+  }
+
+  /**
+   * 播放攻击冲刺动画
+   *
+   * @param sourceId 攻击者 ID
+   * @param targetId 目标 ID
+   */
+  playAttackLunge(sourceId: string, targetId: string): string {
+    const animationId = this.generateAnimationId();
+
+    const sourcePos = this.unitPositions.get(sourceId);
+    const targetPos = this.unitPositions.get(targetId);
+
+    if (!sourcePos || !targetPos) {
+      console.warn('[BattleAnimationManager] Cannot play lunge: missing position data');
+      return '';
+    }
+
+    const distance = Math.abs(targetPos.x - sourcePos.x) * 0.5;
+
+    const instance: AnimationInstance = {
+      id: animationId,
+      config: {
+        type: AnimationType.ATTACK_LUNGE,
+        sourceId,
+        targetId,
+        duration: 150,
+        params: {
+          distance,
+          direction: sourcePos.x < targetPos.x ? 1 : -1,
+        },
+      },
+      startTime: Date.now(),
+      completed: false,
+      progress: 0,
+    };
+
+    this.animationQueue.push(instance);
+    return animationId;
+  }
+
+  /**
+   * 播放受击后退动画
+   *
+   * @param targetId 目标 ID
+   */
+  playHitRecoil(targetId: string, distance: number = 10): string {
+    const animationId = this.generateAnimationId();
+
+    const instance: AnimationInstance = {
+      id: animationId,
+      config: {
+        type: AnimationType.HIT_RECOIL,
+        targetId,
+        duration: 200,
+        params: { distance },
+      },
+      startTime: Date.now(),
+      completed: false,
+      progress: 0,
+    };
+
+    this.animationQueue.push(instance);
+    return animationId;
+  }
+
+  /**
+   * 播放暴击特效
+   *
+   * @param targetId 目标 ID
+   */
+  playCriticalHit(targetId: string): string {
+    const animationId = this.generateAnimationId();
+
+    const position = this.unitPositions.get(targetId);
+    if (!position) return '';
+
+    const instance: AnimationInstance = {
+      id: animationId,
+      config: {
+        type: AnimationType.CRITICAL_HIT,
+        targetId,
+        duration: 400,
+        params: { x: position.x + 48, y: position.y + 48 },
+      },
+      startTime: Date.now(),
+      completed: false,
+      progress: 0,
+    };
+
+    this.animationQueue.push(instance);
+    return animationId;
+  }
+
+  /**
+   * 播放连击数显示
+   */
+  private showCombo(): void {
+    if (this.currentCombo < 2) return;
+
+    const animationId = this.generateAnimationId();
+
+    const instance: AnimationInstance = {
+      id: animationId,
+      config: {
+        type: AnimationType.COMBO_COUNT,
+        duration: 500,
+        params: {
+          count: this.currentCombo,
+          x: this.canvasSize.width / 2,
+          y: 100,
+        },
+      },
+      startTime: Date.now(),
+      completed: false,
+      progress: 0,
+    };
+
+    this.animationQueue.push(instance);
+  }
+
+  /**
+   * 增加连击数
+   */
+  private incrementCombo(): void {
+    this.currentCombo++;
+    void this.currentCombo; // 避免未使用警告
+    this.showCombo();
+
+    // 重置连击计时器
+    if (this.comboTimer) {
+      clearTimeout(this.comboTimer);
+    }
+    this.comboTimer = window.setTimeout(() => {
+      this.resetCombo();
+    }, 2000); // 2秒后重置连击
+  }
+
+  /**
+   * 重置连击数
+   */
+  private resetCombo(): void {
+    this.currentCombo = 0;
+    if (this.comboTimer) {
+      clearTimeout(this.comboTimer);
+      this.comboTimer = null;
+    }
+  }
+
+  /**
+   * 播放技能光波
+   *
+   * @param startX 起始 X
+   * @param startY 起始 Y
+   * @param targetX 目标 X
+   * @param targetY 目标 Y
+   * @param color 光波颜色
+   */
+  playSkillWave(startX: number, startY: number, targetX: number, targetY: number, color: string): string {
+    const animationId = this.generateAnimationId();
+
+    const instance: AnimationInstance = {
+      id: animationId,
+      config: {
+        type: AnimationType.SKILL_WAVE,
+        duration: 400,
+        params: {
+          startX, startY, targetX, targetY, color,
+          width: 20,
+        },
+      },
+      startTime: Date.now(),
+      completed: false,
+      progress: 0,
     };
 
     this.animationQueue.push(instance);
@@ -566,7 +1071,7 @@ export class BattleAnimationManager {
       id: animationId,
       config: {
         type: AnimationType.BATTLE_ENTER,
-        duration: 1000,
+        duration: 1200,
         params: {
           playerUnits,
           enemyUnits,
@@ -574,6 +1079,7 @@ export class BattleAnimationManager {
       },
       startTime: Date.now(),
       completed: false,
+      progress: 0,
     };
 
     this.animationQueue.push(instance);
@@ -590,10 +1096,11 @@ export class BattleAnimationManager {
       id: animationId,
       config: {
         type: AnimationType.BATTLE_EXIT,
-        duration: 800,
+        duration: 1000,
       },
       startTime: Date.now(),
       completed: false,
+      progress: 0,
     };
 
     this.animationQueue.push(instance);
@@ -613,10 +1120,11 @@ export class BattleAnimationManager {
       config: {
         type: AnimationType.MONSTER_APPEAR,
         targetId: unitId,
-        duration: 500,
+        duration: 600,
       },
       startTime: Date.now(),
       completed: false,
+      progress: 0,
     };
 
     this.animationQueue.push(instance);
@@ -640,6 +1148,7 @@ export class BattleAnimationManager {
       },
       startTime: Date.now(),
       completed: false,
+      progress: 0,
     };
 
     this.animationQueue.push(instance);
@@ -660,11 +1169,12 @@ export class BattleAnimationManager {
       config: {
         type: AnimationType.LEVEL_UP,
         targetId: unitId,
-        duration: 1500,
+        duration: 1800,
         params: { newLevel },
       },
       startTime: Date.now(),
       completed: false,
+      progress: 0,
     };
 
     this.animationQueue.push(instance);
@@ -672,15 +1182,39 @@ export class BattleAnimationManager {
   }
 
   /**
+   * 获取当前的屏幕偏移（用于震动效果）
+   */
+  getScreenOffset(): { x: number; y: number } {
+    return { ...this.screenOffset };
+  }
+
+  /**
+   * 检查是否处于顿帧状态
+   */
+  isHitstopActive(): boolean {
+    return this.hitstopActive;
+  }
+
+  /**
    * 更新动画（每帧调用）
    */
   update(): void {
-    const now = Date.now();
+    // const now = Date.now();
+
+    // 检查顿帧状态
+    if (this.hitstopActive && Date.now() > this.hitstopEndTime) {
+      this.hitstopActive = false;
+    }
+
+    // 处于顿帧状态时不更新动画
+    if (this.hitstopActive) {
+      return;
+    }
 
     // 处理队列中的动画
     for (let i = this.animationQueue.length - 1; i >= 0; i--) {
       const animation = this.animationQueue[i];
-      if (animation.config.delay && now - animation.startTime < animation.config.delay) {
+      if (animation.config.delay && Date.now() - animation.startTime < animation.config.delay) {
         continue;
       }
 
@@ -692,8 +1226,9 @@ export class BattleAnimationManager {
     // 更新正在播放的动画
     const completedIds: string[] = [];
     for (const [_id, animation] of this.activeAnimations) {
-      const elapsed = now - animation.startTime;
+      const elapsed = Date.now() - animation.startTime;
       const duration = animation.config.duration || 500;
+      animation.progress = Math.min(elapsed / duration, 1);
 
       if (elapsed >= duration) {
         animation.completed = true;
@@ -718,12 +1253,13 @@ export class BattleAnimationManager {
   render(): void {
     if (!this.ctx) return;
 
-    const now = Date.now();
+    // const now = Date.now();
+
+    // 重置屏幕偏移
+    this.screenOffset = { x: 0, y: 0 };
 
     for (const [_id, animation] of this.activeAnimations) {
-      const elapsed = now - animation.startTime;
-      const duration = animation.config.duration || 500;
-      const progress = Math.min(elapsed / duration, 1);
+      const progress = animation.progress;
 
       switch (animation.config.type) {
         case AnimationType.DAMAGE_FLOAT:
@@ -750,6 +1286,38 @@ export class BattleAnimationManager {
         case AnimationType.MONSTER_DISAPPEAR:
           this.renderMonsterDisappear(animation, progress);
           break;
+
+        case AnimationType.CRITICAL_HIT:
+          this.renderCriticalHit(animation, progress);
+          break;
+
+        case AnimationType.COMBO_COUNT:
+          this.renderComboCount(animation, progress);
+          break;
+
+        case AnimationType.STATUS_EFFECT:
+          this.renderStatusEffect(animation, progress);
+          break;
+
+        case AnimationType.SKILL_WAVE:
+          this.renderSkillWave(animation, progress);
+          break;
+
+        case AnimationType.SCREEN_SHAKE:
+          this.applyScreenShake(animation, progress);
+          break;
+
+        case AnimationType.BATTLE_ENTER:
+          this.renderBattleEnter(animation, progress);
+          break;
+
+        case AnimationType.BATTLE_EXIT:
+          this.renderBattleExit(animation, progress);
+          break;
+
+        case AnimationType.ULTIMATE:
+          this.renderUltimate(animation, progress);
+          break;
       }
     }
   }
@@ -767,7 +1335,7 @@ export class BattleAnimationManager {
 
     this.ctx.save();
     this.ctx.globalAlpha = alpha;
-    this.ctx.font = 'bold 24px Arial';
+    this.ctx.font = `bold ${params.fontSize || 24}px Arial`;
     this.ctx.textAlign = 'center';
 
     // 根据类型设置颜色
@@ -777,8 +1345,17 @@ export class BattleAnimationManager {
     // 绘制阴影
     this.ctx.strokeStyle = 'rgba(0,0,0,0.5)';
     this.ctx.lineWidth = 3;
-    this.ctx.strokeText(`-${params.value}`, params.startX, currentY);
-    this.ctx.fillText(`-${params.value}`, params.startX, currentY);
+    const text = params.color === FloatColor.HEAL ? `+${params.value}` : `-${params.value}`;
+    this.ctx.strokeText(text, params.startX, currentY);
+    this.ctx.fillText(text, params.startX, currentY);
+
+    // 暴击时添加额外效果
+    if (params.isCritical) {
+      this.ctx.font = 'italic 16px Arial';
+      this.ctx.fillStyle = '#FFD700';
+      this.ctx.strokeText('暴击!', params.startX, currentY - 30);
+      this.ctx.fillText('暴击!', params.startX, currentY - 30);
+    }
 
     this.ctx.restore();
   }
@@ -819,9 +1396,57 @@ export class BattleAnimationManager {
     this.ctx.font = 'bold 14px Arial';
     this.ctx.textAlign = 'left';
     this.ctx.fillStyle = '#FFD700';
+    this.ctx.strokeText(params.statusName, 0, 0);
     this.ctx.fillText(params.statusName, 0, 0);
 
     this.ctx.restore();
+  }
+
+  /**
+   * 渲染状态持续效果
+   */
+  private renderStatusEffect(animation: AnimationInstance, progress: number): void {
+    if (!this.ctx || !animation.config.targetId) return;
+
+    const position = this.unitPositions.get(animation.config.targetId);
+    if (!position) return;
+
+    const params = animation.config.params as { statusId: StatusEffectId; statusName: string };
+    const statusColor = this.getStatusColor(params.statusId);
+
+    this.ctx.save();
+
+    // 状态特效：粒子效果
+    const particleCount = 5;
+    for (let i = 0; i < particleCount; i++) {
+      const angle = (progress * Math.PI * 2) + (i * (Math.PI * 2 / particleCount));
+      const radius = 20 + Math.sin(progress * Math.PI * 4) * 10;
+      const x = position.x + 48 + Math.cos(angle) * radius;
+      const y = position.y + 48 + Math.sin(angle) * radius;
+
+      this.ctx.beginPath();
+      this.ctx.arc(x, y, 3, 0, Math.PI * 2);
+      this.ctx.fillStyle = statusColor;
+      this.ctx.globalAlpha = 1 - progress;
+      this.ctx.fill();
+    }
+
+    this.ctx.restore();
+  }
+
+  /**
+   * 获取状态对应的颜色
+   */
+  private getStatusColor(statusId: StatusEffectId): string {
+    const colorMap: Partial<Record<StatusEffectId, string>> = {
+      [StatusEffectId.POISON]: '#AA44FF',
+      [StatusEffectId.BAD_POISON]: '#6622AA',
+      [StatusEffectId.BURN]: '#FF4444',
+      [StatusEffectId.PARALYSIS]: '#FFFF44',
+      [StatusEffectId.FREEZE]: '#88FFFF',
+      [StatusEffectId.SLEEP]: '#4444FF',
+    };
+    return colorMap[statusId] || '#FFFFFF';
   }
 
   /**
@@ -846,6 +1471,220 @@ export class BattleAnimationManager {
     this.ctx.fillRect(position.x, position.y, 96, 96);
 
     this.ctx.restore();
+  }
+
+  /**
+   * 渲染暴击特效
+   */
+  private renderCriticalHit(animation: AnimationInstance, progress: number): void {
+    if (!this.ctx) return;
+
+    const params = animation.config.params as { x: number; y: number };
+
+    this.ctx.save();
+
+    // 暴击文字
+    const scale = 1 + progress * 0.5;
+    const alpha = 1 - progress;
+
+    this.ctx.translate(params.x, params.y);
+    this.ctx.scale(scale, scale);
+    this.ctx.globalAlpha = alpha;
+
+    this.ctx.font = 'bold 48px Arial';
+    this.ctx.textAlign = 'center';
+    this.ctx.fillStyle = '#FF0000';
+    this.ctx.strokeStyle = '#FFFF00';
+    this.ctx.lineWidth = 4;
+
+    this.ctx.strokeText('CRITICAL!', 0, 0);
+    this.ctx.fillText('CRITICAL!', 0, 0);
+
+    // 星星效果
+    const starCount = 5;
+    for (let i = 0; i < starCount; i++) {
+      const angle = (i / starCount) * Math.PI * 2 + progress * Math.PI;
+      const radius = 60 + progress * 30;
+      const starX = Math.cos(angle) * radius;
+      const starY = Math.sin(angle) * radius;
+
+      this.ctx.font = '24px Arial';
+      this.ctx.fillText('★', starX, starY);
+    }
+
+    this.ctx.restore();
+  }
+
+  /**
+   * 渲染连击数
+   */
+  private renderComboCount(animation: AnimationInstance, progress: number): void {
+    if (!this.ctx) return;
+
+    const params = animation.config.params as { count: number; x: number; y: number };
+
+    this.ctx.save();
+
+    const scale = 1 + Math.sin(progress * Math.PI) * 0.2;
+    const alpha = progress < 0.2 ? progress * 5 : (1 - progress) * 1.25;
+
+    this.ctx.translate(params.x, params.y);
+    this.ctx.scale(scale, scale);
+    this.ctx.globalAlpha = alpha;
+
+    this.ctx.font = 'bold 36px Arial';
+    this.ctx.textAlign = 'center';
+
+    // 连击数颜色随数量变化
+    let color = '#FFFFFF';
+    if (params.count >= 10) color = '#FF0000';
+    else if (params.count >= 5) color = '#FF8800';
+    else if (params.count >= 3) color = '#FFFF00';
+
+    this.ctx.fillStyle = color;
+    this.ctx.strokeStyle = '#000000';
+    this.ctx.lineWidth = 4;
+
+    this.ctx.strokeText(`${params.count} HIT`, 0, 0);
+    this.ctx.fillText(`${params.count} HIT`, 0, 0);
+
+    this.ctx.restore();
+  }
+
+  /**
+   * 渲染技能光波
+   */
+  private renderSkillWave(animation: AnimationInstance, progress: number): void {
+    if (!this.ctx) return;
+
+    const params = animation.config.params as SkillWaveConfig;
+
+    this.ctx.save();
+
+    // 计算当前位置
+    const currentX = params.startX + (params.targetX - params.startX) * progress;
+    const currentY = params.startY + (params.targetY - params.startY) * progress;
+
+    // 绘制光波
+    const gradient = this.ctx.createRadialGradient(currentX, currentY, 0, currentX, currentY, params.width);
+    gradient.addColorStop(0, params.color);
+    gradient.addColorStop(1, 'rgba(255,255,255,0)');
+
+    this.ctx.globalAlpha = 1 - progress;
+    this.ctx.fillStyle = gradient;
+    this.ctx.beginPath();
+    this.ctx.arc(currentX, currentY, params.width * (1 + progress), 0, Math.PI * 2);
+    this.ctx.fill();
+
+    this.ctx.restore();
+  }
+
+  /**
+   * 应用屏幕震动
+   */
+  private applyScreenShake(animation: AnimationInstance, progress: number): void {
+    const params = animation.config.params as ShakeConfig;
+    const direction = params.direction || 'both';
+
+    // 计算当前震动偏移
+    const phase = progress * Math.PI * 2 * params.count;
+    const offsetX = direction === 'y' ? 0 : Math.sin(phase) * params.intensity;
+    const offsetY = direction === 'x' ? 0 : Math.cos(phase) * params.intensity;
+
+    this.screenOffset.x = offsetX;
+    this.screenOffset.y = offsetY;
+  }
+
+  /**
+   * 渲染战斗进入动画
+   */
+  private renderBattleEnter(_animation: AnimationInstance, progress: number): void {
+    if (!this.ctx) return;
+
+    // 黑色渐变效果
+    if (progress < 0.5) {
+      const alpha = 1 - (progress * 2);
+      this.ctx.fillStyle = `rgba(0,0,0,${alpha})`;
+      this.ctx.fillRect(0, 0, this.canvasSize.width, this.canvasSize.height);
+    } else {
+      const alpha = (progress - 0.5) * 2;
+      this.ctx.fillStyle = `rgba(0,0,0,${alpha})`;
+      this.ctx.fillRect(0, 0, this.canvasSize.width, this.canvasSize.height);
+    }
+
+    // 战斗开始文字
+    if (progress > 0.3 && progress < 0.7) {
+      const textAlpha = progress > 0.5 ? (0.7 - progress) * 5 : (progress - 0.3) * 5;
+      this.ctx.save();
+      this.ctx.globalAlpha = textAlpha;
+      this.ctx.font = 'bold 48px Arial';
+      this.ctx.textAlign = 'center';
+      this.ctx.fillStyle = '#FFFFFF';
+      this.ctx.strokeStyle = '#000000';
+      this.ctx.lineWidth = 6;
+      this.ctx.strokeText('BATTLE START!', this.canvasSize.width / 2, this.canvasSize.height / 2);
+      this.ctx.fillText('BATTLE START!', this.canvasSize.width / 2, this.canvasSize.height / 2);
+      this.ctx.restore();
+    }
+  }
+
+  /**
+   * 渲染战斗退出动画
+   */
+  private renderBattleExit(_animation: AnimationInstance, progress: number): void {
+    if (!this.ctx) return;
+
+    // 黑色渐变效果
+    const alpha = progress;
+    this.ctx.fillStyle = `rgba(0,0,0,${alpha})`;
+    this.ctx.fillRect(0, 0, this.canvasSize.width, this.canvasSize.height);
+
+    // 战斗结束文字
+    if (progress > 0.2) {
+      const textAlpha = Math.min((progress - 0.2) * 1.25, 1);
+      this.ctx.save();
+      this.ctx.globalAlpha = textAlpha;
+      this.ctx.font = 'bold 48px Arial';
+      this.ctx.textAlign = 'center';
+      this.ctx.fillStyle = '#FFD700';
+      this.ctx.strokeStyle = '#000000';
+      this.ctx.lineWidth = 6;
+      this.ctx.strokeText('VICTORY!', this.canvasSize.width / 2, this.canvasSize.height / 2);
+      this.ctx.fillText('VICTORY!', this.canvasSize.width / 2, this.canvasSize.height / 2);
+      this.ctx.restore();
+    }
+  }
+
+  /**
+   * 渲染必杀技动画
+   */
+  private renderUltimate(_animation: AnimationInstance, progress: number): void {
+    if (!this.ctx) return;
+
+    // 能量汇聚效果
+    if (progress < 0.3) {
+      const alpha = progress / 0.3;
+      this.ctx.save();
+      this.ctx.globalAlpha = alpha;
+      this.ctx.fillStyle = 'rgba(255,215,0,0.3)';
+      this.ctx.fillRect(0, 0, this.canvasSize.width, this.canvasSize.height);
+      this.ctx.restore();
+    }
+
+    // 必杀技文字
+    if (progress > 0.2 && progress < 0.8) {
+      const textAlpha = progress > 0.5 ? (0.8 - progress) * 3.33 : (progress - 0.2) * 3.33;
+      this.ctx.save();
+      this.ctx.globalAlpha = textAlpha;
+      this.ctx.font = 'bold 56px Arial';
+      this.ctx.textAlign = 'center';
+      this.ctx.fillStyle = '#FFD700';
+      this.ctx.strokeStyle = '#FF0000';
+      this.ctx.lineWidth = 8;
+      this.ctx.strokeText('ULTIMATE!', this.canvasSize.width / 2, this.canvasSize.height / 2);
+      this.ctx.fillText('ULTIMATE!', this.canvasSize.width / 2, this.canvasSize.height / 2);
+      this.ctx.restore();
+    }
   }
 
   /**
@@ -903,6 +1742,7 @@ export class BattleAnimationManager {
   private renderMonsterAppear(_animation: AnimationInstance, _progress: number): void {
     // 简化实现：由外部渲染器处理
     // 这里只记录动画进度供外部使用
+    // 实际绘制会使用 progress 参数进行缩放和淡入效果
   }
 
   /**
@@ -983,6 +1823,10 @@ export class BattleAnimationManager {
         return '#AA44FF';
       case FloatColor.EXP:
         return '#FFDD00';
+      case FloatColor.DRAIN:
+        return '#00CCCC';
+      case FloatColor.REFLECT:
+        return '#888888';
       default:
         return '#FFFFFF';
     }
@@ -1043,6 +1887,10 @@ export class BattleAnimationManager {
   clear(): void {
     this.animationQueue = [];
     this.activeAnimations.clear();
+    this.statusEffects.clear();
+    this.resetCombo();
+    this.hitstopActive = false;
+    this.screenOffset = { x: 0, y: 0 };
     console.log('[BattleAnimationManager] All animations cleared');
   }
 
