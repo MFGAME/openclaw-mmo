@@ -4,6 +4,8 @@ import { npcManager, NPC } from './NPCManager';
 import { dialogManager } from './DialogManager';
 import { sceneManager } from './SceneManager';
 import { TMXObject } from './MapParser';
+import { shopUI } from '../components/ShopUI';
+import { audioManager } from './AudioManager';
 
 /**
  * 交互类型枚举
@@ -314,14 +316,41 @@ export class InteractionManager {
    * 处理商店
    */
   private handleShop(npc: NPC): InteractionResult {
+    // 播放商店音效
+    audioManager.playSFX('shop_open');
+
+    // 显示欢迎对话（如果有）
     const dialogue = npc.dialogues[0];
     if (dialogue) {
       dialogManager.showDialogue(npc.id, dialogue);
     }
 
-    // TODO: 打开商店 UI
-    console.log(`[InteractionManager] 打开商店: ${npc.name}`);
-    return { success: true };
+    // 获取关联的商店 ID（从 NPC 自定义数据中获取）
+    const shopId = (npc.customData?.shopId as string) || 'village_general_shop';
+
+    // 打开商店 UI
+    const success = shopUI.openShop(shopId, 'player', new Map());
+
+    if (success) {
+      // 设置商店关闭回调
+      const shopCloseCallback = () => {
+        console.log(`[InteractionManager] 商店关闭: ${npc.name}`);
+        shopUI.setCallback(() => {});
+        npcManager.endInteraction();
+      };
+
+      shopUI.setCallback((action) => {
+        if (action === 'back' || action === 'cancel') {
+          shopCloseCallback();
+        }
+      });
+
+      console.log(`[InteractionManager] 打开商店: ${npc.name}`);
+      return { success: true, callback: shopCloseCallback };
+    } else {
+      console.error(`[InteractionManager] 无法打开商店: ${shopId}`);
+      return { success: false, message: '商店无法打开' };
+    }
   }
 
   /**

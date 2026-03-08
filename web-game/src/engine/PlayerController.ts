@@ -1,6 +1,7 @@
 import { inputManager, KeyCode, SwipeDirection } from './InputManager';
 import { collisionManager } from './CollisionManager';
 import { pathfinder, PathPoint } from './Pathfinder';
+import { audioManager } from './AudioManager';
 
 /**
  * 方向枚举
@@ -400,6 +401,9 @@ export class PlayerController {
     this.jumpStartX = this.position.x;
     this.jumpStartY = this.position.y;
 
+    // 播放跳跃音效（使用 Tuxemon 音效资源）
+    audioManager.playSFX('jump');
+
     // 触发跳跃开始回调
     this.triggerJumpStart({
       fromX: this.position.tileX,
@@ -525,6 +529,11 @@ export class PlayerController {
       this.position.tileX = Math.round(this.targetX / this.config.tileWidth);
       this.position.tileY = Math.round(this.targetY / this.config.tileHeight);
       this.state = PlayerState.IDLE;
+
+      // 播放移动音效（跑步时播放脚步声）
+      if (this.running) {
+        audioManager.playSFX('footstep');
+      }
 
       // 触发移动完成回调
       if (this.currentMoveDirection) {

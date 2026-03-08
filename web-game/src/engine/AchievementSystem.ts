@@ -723,6 +723,13 @@ export class AchievementSystem {
       if (this.config.enableNotification) {
         this.sendNotification(playerId, achievementId);
       }
+
+      // 显示成就通知 UI
+      // 动态导入以避免循环依赖
+      import('./AchievementNotificationUI').then(module => {
+        const achievementNotificationUI = module.achievementNotificationUI;
+        achievementNotificationUI.showNotification(achievementId);
+      });
     }
 
     return true;

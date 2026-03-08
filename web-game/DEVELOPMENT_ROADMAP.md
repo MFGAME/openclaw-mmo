@@ -152,11 +152,11 @@
 
 ---
 
-**最近更新：** 2026-03-08 11:02
+**最近更新：** 2026-03-08 11:07
 **本次心跳完成：**
-- ✅ ItemDataLoader.ts - 道具数据加载器（113 个道具、图标加载、查询接口）
-- ✅ MusicLoader.ts - 音乐加载器（13 种场景、播放控制、音量持久化）
-- ✅ SoundLoader.ts - 音效加载器（6 个分组、优先级管理、并发控制）
+- ✅ PlayerController.ts - 跑步/跳跃系统增强（Shift 加速、空格跳跃、音效）
+- ✅ ShopManager.ts/ShopUI.ts - NPC 商店系统完善（购买/出售、货币集成）
+- ✅ AchievementSystem.ts/AchievementNotificationUI.ts - 成就系统实现（18 个成就、通知 UI）
 
 ---
 
