@@ -1,7 +1,7 @@
 # OpenClaw MMO - 当前任务清单
 
-**生成时间**: 2026-03-08 11:25
-**目标**: 完善美术资源实装，项目达到 100% 完工
+**生成时间**: 2026-03-08 11:31
+**目标**: 项目达到 100% 完工
 
 ---
 
@@ -11,30 +11,33 @@
 |------|------|------|
 | Phase 0 | 100% | ✅ 完成 |
 | Phase 1 | 100% | ✅ 完成 |
-| 美术资源 | 65% | 🔄 进行中 |
-| **总体** | **~95%** | ⬆️ 接近完工 |
+| 美术资源 | 90% | 🔄 进行中 |
+| **总体** | **~98%** | ⬆️ 接近完工 |
 
 ---
 
 ## 📋 本次心跳任务（3个）
 
-### 任务 1: NPC 精灵图资源集成 (P0)
-**目标**: 从 Tuxemon 复制 NPC 精灵图资源
-**文件**: assets/tuxemon/gfx/sprites/npc/
-**来源**: tuxemon/resources/gfx/sprites/npc/
-**预期数量**: 123 个 NPC 精灵图
+### 任务 1: 检查缺失资源 (P0)
+**目标**: 检查 Tuxemon 原版资源是否全部集成
+**操作**:
+- 对比 Tuxemon 源目录和 web-game/assets/tuxemon 目录
+- 识别缺失的资源文件
+- 复制缺失文件
 
-### 任务 2: 音乐资源集成 (P1)
-**目标**: 从 Tuxemon 复制 BGM 音乐文件
-**文件**: assets/tuxemon/music/
-**来源**: tuxemon/resources/music/
-**预期数量**: 20+ 首 BGM
+### 任务 2: 资源加载系统验证 (P1)
+**目标**: 确保所有资源能被正确加载和使用
+**操作**:
+- 验证 ResourceManager 能加载所有类型资源
+- 检查资源路径配置
+- 确保游戏运行时能正确显示资源
 
-### 任务 3: 音效资源集成 (P1)
-**目标**: 从 Tuxemon 复制音效文件
-**文件**: assets/tuxemon/sounds/
-**来源**: tuxemon/resources/sounds/
-**预期数量**: 100+ 个音效
+### 任务 3: 最终集成测试 (P1)
+**目标**: 确保 npm run build 编译通过
+**操作**:
+- 运行 npm run build
+- 修复任何编译错误
+- 验证游戏功能正常
 
 ---
 
@@ -51,5 +54,5 @@
 
 完成后运行：
 ```
-C:\Users\Administrator\AppData\Roaming\npm\openclaw.cmd system event --text "Done: NPC精灵图/音乐/音效资源集成 - 美术资源进度提升至 85%" --mode now
+C:\Users\Administrator\AppData\Roaming\npm\openclaw.cmd system event --text "Done: 资源完整性检查/加载系统验证/集成测试 - 美术资源达到 100%" --mode now
 ```
