@@ -10,7 +10,7 @@ import { npcManager, NPCBehavior, NPCInteractionType, NPCDialogue } from './engi
 import { dialogManager } from './engine/DialogManager.js';
 import { interactionManager } from './engine/InteractionManager.js';
 import { sceneManager, SceneData } from './engine/SceneManager.js';
-import { TMXMapData, TMXTileLayer } from './engine/MapParser.js';
+import { TMXMapData, TMXTileset, mapParser } from './engine/MapParser.js';
 import { monsterDataLoader } from './engine/MonsterData.js';
 import { techniqueDataLoader } from './engine/TechniqueData.js';
 import { eventSystem } from './engine/EventSystem.js';
@@ -18,59 +18,33 @@ import { audioManager } from './engine/AudioManager.js';
 import { itemDataLoader } from './engine/ItemData.js';
 import { titleScreen } from './engine/TitleScreen.js';
 import { bagUI } from './engine/BagUI.js';
-
-
-/**
- * 测试地图数据（简单示例）
- * 0: 可通行, 1: 墙壁, 2: 水面, 3: 草地
- */
-const TEST_MAP_WIDTH = 20;
-const TEST_MAP_HEIGHT = 15;
-const TEST_MAP_DATA = [
-  1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
-  1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1,
-  1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1,
-  1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1,
-  1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1,
-  1, 1, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 1, 1,
-  1, 1, 0, 0, 0, 0, 0, 0, 1, 2, 2, 1, 0, 0, 0, 0, 0, 0, 1, 1,
-  1, 1, 0, 0, 0, 0, 0, 0, 1, 2, 2, 1, 0, 0, 0, 0, 0, 0, 1, 1,
-  1, 1, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 1, 1,
-  1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1,
-  1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1,
-  1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1,
-  1, 0, 0, 0, 3, 3, 3, 0, 0, 0, 0, 0, 0, 3, 3, 3, 0, 0, 0, 1,
-  1, 0, 0, 0, 3, 3, 3, 0, 0, 0, 0, 0, 0, 3, 3, 3, 0, 0, 0, 1,
-  1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
-];
+import { io, Socket } from 'socket.io-client';
 
 /**
- * 创建测试地图数据
+ * 其他玩家数据接口
  */
-function createTestMapData(): TMXMapData {
-  const tileLayer: TMXTileLayer = {
-    name: 'ground',
-    width: TEST_MAP_WIDTH,
-    height: TEST_MAP_HEIGHT,
-    data: TEST_MAP_DATA,
-    properties: {},
-    visible: true,
-    opacity: 1,
-    offsetX: 0,
-    offsetY: 0,
-  };
-
-  return {
-    width: TEST_MAP_WIDTH,
-    height: TEST_MAP_HEIGHT,
-    tileWidth: 32,
-    tileHeight: 32,
-    renderOrder: 'right-down',
-    tileLayers: [tileLayer],
-    objectGroups: [],
-    tilesets: [],
-    properties: {},
-  };
+interface OtherPlayer {
+    id: string;
+    name: string;
+    x: number;
+    y: number;
+    direction: Direction;
+    level: number;
+    isBot: boolean;
+}
+interface BattleData {
+    battleId: string;
+    opponent: OtherPlayer;
+}
+/**
+ * 瓦片图片缓存（GID -> Image）
+ */
+interface TilesetImage {
+    image: HTMLImageElement;
+    tileWidth: number;
+    tileHeight: number;
+    columns: number;
+    firstGid: number;
 }
 
 /**
@@ -84,6 +58,9 @@ class OpenClawGame extends Game {
     /** 地图数据 */
     private mapData: TMXMapData | null = null;
 
+    /** 瓦片图片缓存 */
+    private tilesetImages: Map<number, TilesetImage> = new Map();
+
     /** 瓦片宽高 */
     private tileWidth = 32;
     private tileHeight = 32;
@@ -96,9 +73,368 @@ class OpenClawGame extends Game {
     private showDebugInfo = false;
     private gameState: 'loading' | 'title' | 'playing' = 'loading';
 
+    /** Socket.IO 实例 */
+    private socket: Socket | null = null;
+
+    /** 连接状态 */
+    private connectedToMMO = false;
+
+    /** 玩家 ID */
+    private playerId: string = '';
+
+    /** 玩家名称 */
+    private playerName: string = 'Player_' + Math.floor(Math.random() * 10000);
+
+    /** 其他玩家列表 */
+    private otherPlayers: Map<string, OtherPlayer> = new Map();
+
+    /** 最后发送位置的时间 */
+    private lastPositionSendTime = 0;
+
+    /** 位置发送间隔（毫秒） */
+    private readonly POSITION_SEND_INTERVAL = 200;
+
+    /** 连接状态显示元素 */
+    private connectionStatusElement: HTMLElement | null = null;
+
+    /** 选中玩家 ID（用于挑战） */
+    private selectedPlayerId: string | null = null;
+
+    /** 战斗界面是否打开 */
+    private inBattle = false;
+
     constructor() {
         super('game-canvas', 800, 600);
         this.resourceManager = new ResourceManager();
+
+        // 初始化 Socket.IO 连接
+        this.initializeSocketConnection();
+    }
+
+    /**
+     * 初始化 Socket.IO 连接
+     */
+    private initializeSocketConnection(): void {
+        console.log('[MMO] 正在连接到 MMO 服务器...');
+        this.socket = io('http://localhost:3000');
+
+        // 连接成功
+        this.socket.on('connect', () => {
+            this.connectedToMMO = true;
+            this.playerId = this.socket!.id ?? 'unknown';
+            console.log('✅ 已连接到 MMO 服务器，玩家 ID:', this.playerId);
+            this.updateConnectionStatus('已连接', 'connected');
+
+            // 发送玩家加入游戏
+            this.socket!.emit('player_join', {
+                id: this.playerId,
+                name: this.playerName,
+                x: playerController.getPixelPosition().x,
+                y: playerController.getPixelPosition().y,
+                direction: playerController.getFacingDirection(),
+            });
+        });
+
+        // 连接断开
+        this.socket.on('disconnect', () => {
+            this.connectedToMMO = false;
+            console.log('❌ 与服务器断开连接');
+            this.updateConnectionStatus('已断开', 'disconnected');
+        });
+
+        // 连接错误
+        this.socket.on('connect_error', (error: Error) => {
+            console.error('[MMO] 连接错误:', error);
+            this.updateConnectionStatus('连接失败', 'error');
+        });
+
+        // 接收其他玩家更新
+        this.socket.on('players_update', (players: OtherPlayer[]) => {
+            this.updateOtherPlayers(players);
+        });
+
+        // 接收玩家加入
+        this.socket.on('player_joined', (player: OtherPlayer) => {
+            console.log('[MMO] 玩家加入:', player.name);
+            this.otherPlayers.set(player.id, player);
+        });
+
+        // 接收玩家离开
+        this.socket.on('player_left', (playerId: string) => {
+            console.log('[MMO] 玩家离开:', playerId);
+            this.otherPlayers.delete(playerId);
+            if (this.selectedPlayerId === playerId) {
+                this.selectedPlayerId = null;
+            }
+        });
+
+        // 接收玩家移动
+        this.socket.on('player_move', (data: { id: string; x: number; y: number; direction: Direction }) => {
+            const player = this.otherPlayers.get(data.id);
+            if (player) {
+                player.x = data.x;
+                player.y = data.y;
+                player.direction = data.direction;
+            }
+        });
+
+        // 接收挑战请求
+        this.socket.on('challenge_received', (data: { challengerId: string; challengerName: string }) => {
+            console.log('[MMO] 收到挑战请求:', data.challengerName);
+            this.showChallengeDialog(data.challengerId, data.challengerName);
+        });
+
+        // 接收挑战响应
+        this.socket.on('challenge_response', (data: { accepted: boolean; playerId: string; playerName: string }) => {
+            if (data.accepted) {
+                console.log('[MMO] 挑战被接受:', data.playerName);
+                this.startBattle({ battleId: Date.now().toString(), opponent: this.otherPlayers.get(data.playerId)! });
+            } else {
+                console.log('[MMO] 挑战被拒绝:', data.playerName);
+                this.showToast(`${data.playerName} 拒绝了你的挑战`);
+            }
+        });
+
+        // 开始战斗
+        this.socket.on('battle_start', (battleData: BattleData) => {
+            console.log('[MMO] 开始战斗:', battleData);
+            this.startBattle(battleData);
+        });
+
+        // 战斗结束
+        this.socket.on('battle_end', (data: { result: string; opponentId: string }) => {
+            console.log('[MMO] 战斗结束:', data);
+            this.showToast(`战斗结束: ${data.result === 'win' ? '胜利' : data.result === 'lose' ? '失败' : '平局'}`);
+            this.inBattle = false;
+        });
+    }
+
+    /**
+     * 更新其他玩家列表
+     */
+    private updateOtherPlayers(players: OtherPlayer[]): void {
+        // 清除不存在的玩家
+        const currentPlayerIds = new Set(players.map(p => p.id));
+        for (const id of this.otherPlayers.keys()) {
+            if (!currentPlayerIds.has(id) && id !== this.playerId) {
+                this.otherPlayers.delete(id);
+            }
+        }
+
+        // 添加或更新玩家
+        for (const player of players) {
+            if (player.id !== this.playerId) {
+                this.otherPlayers.set(player.id, player);
+            }
+        }
+    }
+
+    /**
+     * 发送玩家位置更新
+     */
+    private sendPlayerPosition(): void {
+        if (!this.socket || !this.connectedToMMO) return;
+
+        const now = Date.now();
+        if (now - this.lastPositionSendTime < this.POSITION_SEND_INTERVAL) return;
+
+        const position = playerController.getPixelPosition();
+        const tilePosition = playerController.getTilePosition();
+
+        this.socket.emit('player_move', {
+            id: this.playerId,
+            x: position.x,
+            y: position.y,
+            tileX: tilePosition.tileX,
+            tileY: tilePosition.tileY,
+            direction: playerController.getFacingDirection(),
+        });
+
+        this.lastPositionSendTime = now;
+    }
+
+    /**
+     * 更新连接状态显示
+     */
+    private updateConnectionStatus(text: string, status: 'connected' | 'disconnected' | 'error'): void {
+        if (!this.connectionStatusElement) {
+            this.connectionStatusElement = document.createElement('div');
+            this.connectionStatusElement.id = 'connection-status';
+            this.connectionStatusElement.style.cssText = `
+                position: fixed;
+                top: 10px;
+                right: 10px;
+                padding: 8px 16px;
+                border-radius: 4px;
+                font-size: 12px;
+                font-weight: bold;
+                z-index: 1000;
+                background: rgba(0, 0, 0, 0.7);
+                color: #fff;
+            `;
+            document.body.appendChild(this.connectionStatusElement);
+        }
+
+        this.connectionStatusElement.textContent = `🌐 ${text}`;
+
+        switch (status) {
+            case 'connected':
+                this.connectionStatusElement.style.color = '#4ade80';
+                break;
+            case 'disconnected':
+                this.connectionStatusElement.style.color = '#f87171';
+                break;
+            case 'error':
+                this.connectionStatusElement.style.color = '#fbbf24';
+                break;
+        }
+    }
+
+    /**
+     * 发送挑战请求
+     */
+    private sendChallenge(targetId: string): void {
+        if (!this.socket || !this.connectedToMMO) {
+            this.showToast('未连接到服务器');
+            return;
+        }
+
+        console.log('[MMO] 发送挑战请求:', targetId);
+        this.socket.emit('challenge_player', {
+            challengerId: this.playerId,
+            challengerName: this.playerName,
+            targetId,
+        });
+        this.showToast(`已向 ${this.otherPlayers.get(targetId)?.name || '玩家'} 发送挑战请求`);
+    }
+
+    /**
+     * 响应挑战
+     */
+    private respondToChallenge(challengerId: string, accepted: boolean): void {
+        if (!this.socket || !this.connectedToMMO) return;
+
+        console.log('[MMO] 响应挑战:', challengerId, accepted);
+        this.socket.emit('challenge_response', {
+            challengerId,
+            responderId: this.playerId,
+            responderName: this.playerName,
+            accepted,
+        });
+
+        if (accepted) {
+            this.inBattle = true;
+            this.showToast('已接受挑战，进入战斗！');
+        }
+    }
+
+    /**
+     * 显示挑战对话框
+     */
+    private showChallengeDialog(challengerId: string, challengerName: string): void {
+        const overlay = document.createElement('div');
+        overlay.style.cssText = `
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.7);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 2000;
+        `;
+
+        const dialog = document.createElement('div');
+        dialog.style.cssText = `
+            background: #1e293b;
+            border: 2px solid #4a9eff;
+            border-radius: 8px;
+            padding: 24px;
+            max-width: 400px;
+            text-align: center;
+            box-shadow: 0 0 30px rgba(74, 158, 255, 0.3);
+        `;
+
+        dialog.innerHTML = `
+            <h2 style="color: #4a9eff; margin-bottom: 16px;">⚔️ 挑战请求</h2>
+            <p style="color: #e2e8f0; margin-bottom: 24px;">
+                <span style="color: #4ade80; font-weight: bold;">${challengerName}</span> 想要与你对战！
+            </p>
+            <div style="display: flex; gap: 12px; justify-content: center;">
+                <button id="accept-challenge" style="
+                    padding: 10px 24px;
+                    background: #4ade80;
+                    border: none;
+                    border-radius: 4px;
+                    color: #0f172a;
+                    font-weight: bold;
+                    cursor: pointer;
+                    font-size: 14px;
+                ">接受挑战</button>
+                <button id="reject-challenge" style="
+                    padding: 10px 24px;
+                    background: #f87171;
+                    border: none;
+                    border-radius: 4px;
+                    color: #0f172a;
+                    font-weight: bold;
+                    cursor: pointer;
+                    font-size: 14px;
+                ">拒绝</button>
+            </div>
+        `;
+
+        overlay.appendChild(dialog);
+        document.body.appendChild(overlay);
+
+        document.getElementById('accept-challenge')?.addEventListener('click', () => {
+            this.respondToChallenge(challengerId, true);
+            document.body.removeChild(overlay);
+        });
+
+        document.getElementById('reject-challenge')?.addEventListener('click', () => {
+            this.respondToChallenge(challengerId, false);
+            document.body.removeChild(overlay);
+        });
+    }
+
+    /**
+     * 开始战斗
+     */
+    private startBattle(battleData: BattleData): void {
+        this.inBattle = true;
+        this.showToast(`与 ${battleData.opponent.name} 的战斗开始！`);
+        console.log('[MMO] 进入战斗:', battleData);
+    }
+
+    /**
+     * 显示提示消息
+     */
+    private showToast(message: string, duration = 3000): void {
+        const toast = document.createElement('div');
+        toast.style.cssText = `
+            position: fixed;
+            bottom: 100px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0, 0, 0, 0.8);
+            color: #fff;
+            padding: 12px 24px;
+            border-radius: 8px;
+            font-size: 14px;
+            z-index: 1500;
+            animation: fadeIn 0.3s ease;
+        `;
+        toast.textContent = message;
+        document.body.appendChild(toast);
+
+        setTimeout(() => {
+            toast.style.opacity = '0';
+            toast.style.transition = 'opacity 0.3s ease';
+            setTimeout(() => document.body.removeChild(toast), 300);
+        }, duration);
     }
 
     /**
@@ -118,74 +454,88 @@ class OpenClawGame extends Game {
         await audioManager.initialize();
         console.log('[Game] Audio manager initialized');
 
-        // 创建测试地图
-        this.mapData = createTestMapData();
-        console.log('[Game] Test map created');
-
-        // 初始化碰撞管理器
-        collisionManager.setMap(this.mapData!);
-        collisionManager.addCollisionLayer({
-            layerName: 'ground',
-            solidTiles: [1], // GID 1 是墙壁
-        });
-        console.log('[Game] Collision manager initialized');
-
-        // 初始化玩家控制器
-        playerController.initialize({
-            tileWidth: this.tileWidth,
-            tileHeight: this.tileHeight,
-            moveSpeed: 200,
-            enableCollision: true,
-            enableSmoothAnimation: true,
-            collisionRadius: 12,
-            keyRepeatDelay: 200,
-            keyRepeatInterval: 100,
-            jumpHeight: 32,
-            jumpDuration: 400,
-        });
-
-        // 设置玩家起始位置（在地图中心附近）
-        playerController.setStartTile(2, 2);
-
-        // 注册移动事件回调
-        playerController.onMoveComplete((event) => {
-            console.log(`[Player] Moved from (${event.fromX}, ${event.fromY}) to (${event.toX}, ${event.toY})`);
-        });
-
-        playerController.onMoveBlocked((event) => {
-            console.log(`[Player] Move blocked at (${event.toX}, ${event.toY})`);
-        });
-        console.log('[Game] Player controller initialized');
-
-        // 初始化 NPC 管理器
-        npcManager.initialize(playerController, this.tileWidth, this.tileHeight);
-
-        // 添加测试 NPC
-        this.createTestNPCs();
-        console.log('[Game] NPC manager initialized');
-
-        // 初始化对话管理器
-        dialogManager.initialize({}, this.getWidth(), this.getHeight());
-        console.log('[Game] Dialog manager initialized');
-
-        // 初始化交互管理器
-        interactionManager.initialize();
-        console.log('[Game] Interaction manager initialized');
-
-        // 初始化场景管理器
-        sceneManager.initialize(this.tileWidth, this.tileHeight);
-
-        // 初始化事件系统
-        eventSystem.initialize(this.tileWidth, this.tileHeight);
-
-        // 注册测试场景
-        this.createTestScenes();
-        console.log('[Game] Scene manager initialized');
-        console.log('[Game] Event system initialized');
-
         try {
+            // 加载真实 Tuxemon 地图
+            console.log('[Game] Loading Tuxemon map: azure_town.tmx');
+            this.updateLoadingText('加载地图...');
+
+            this.mapData = await mapParser.loadFromUrl('assets/tuxemon/maps/azure_town.tmx');
+
+            // 设置瓦片宽高
+            this.tileWidth = this.mapData.tileWidth;
+            this.tileHeight = this.mapData.tileHeight;
+
+            console.log(`[Game] Map loaded: ${this.mapData.width}x${this.mapData.height}, ${this.mapData.tilesets.length} tilesets, ${this.mapData.tileLayers.length} layers`);
+
+            // 预加载瓦片图片
+            await this.loadTilesetImages(this.mapData.tilesets);
+            console.log(`[Game] Tileset images loaded: ${this.tilesetImages.size} tiles`);
+
+            // 初始化碰撞管理器
+            collisionManager.setMap(this.mapData);
+            collisionManager.addCollisionLayer({
+                layerName: 'collision',
+                solidTiles: this.findSolidTiles(),
+            });
+            console.log('[Game] Collision manager initialized');
+
+            // 初始化玩家控制器
+            playerController.initialize({
+                tileWidth: this.tileWidth,
+                tileHeight: this.tileHeight,
+                moveSpeed: 150,
+                enableCollision: true,
+                enableSmoothAnimation: true,
+                collisionRadius: 8,
+                keyRepeatDelay: 200,
+                keyRepeatInterval: 100,
+                jumpHeight: 16,
+                jumpDuration: 300,
+            });
+
+            // 设置玩家起始位置（在地图中心附近）
+            playerController.setStartTile(25, 25);
+
+            // 注册移动事件回调
+            playerController.onMoveComplete((event) => {
+                console.log(`[Player] Moved from (${event.fromX}, ${event.fromY}) to (${event.toX}, ${event.toY})`);
+            });
+
+            playerController.onMoveBlocked((event) => {
+                console.log(`[Player] Move blocked at (${event.toX}, ${event.toY})`);
+            });
+            console.log('[Game] Player controller initialized');
+
+            // 初始化 NPC 管理器
+            npcManager.initialize(playerController, this.tileWidth, this.tileHeight);
+
+            // 添加测试 NPC
+            this.createTestNPCs();
+            console.log('[Game] NPC manager initialized');
+
+            // 初始化对话管理器
+            dialogManager.initialize({}, this.getWidth(), this.getHeight());
+            console.log('[Game] Dialog manager initialized');
+
+            // 初始化交互管理器
+            interactionManager.initialize();
+            console.log('[Game] Interaction manager initialized');
+
+            // 初始化场景管理器
+            sceneManager.initialize(this.tileWidth, this.tileHeight);
+
+            // 初始化事件系统
+            eventSystem.initialize(this.tileWidth, this.tileHeight);
+
+            // 注册测试场景
+            this.createTestScenes();
+            console.log('[Game] Scene manager initialized');
+            console.log('[Game] Event system initialized');
+
             // 加载 Tuxemon 资源
             console.log('[Game] Loading Tuxemon resources...');
+            this.updateLoadingText('加载资源...');
+
             await monsterDataLoader.loadMonsters();
             await techniqueDataLoader.loadTechniques();
             console.log('[Game] Tuxemon resources loaded');
@@ -221,6 +571,73 @@ class OpenClawGame extends Game {
     }
 
     /**
+     * 加载瓦片图片
+     */
+    private async loadTilesetImages(tilesets: TMXTileset[]): Promise<void> {
+        const loadPromises: Promise<void>[] = [];
+
+        for (const tileset of tilesets) {
+            if (!tileset.image) continue;
+
+            loadPromises.push((async () => {
+                try {
+                    const imagePath = `assets/tuxemon/${tileset.image}`;
+                    this.updateLoadingText(`加载瓦片集: ${tileset.name}`);
+                    console.log(`[Game] Loading tileset image: ${imagePath}`);
+
+                    const image = new Image();
+                    image.crossOrigin = 'anonymous';
+
+                    await new Promise<void>((resolve, reject) => {
+                        image.onload = () => resolve();
+                        image.onerror = () => reject(new Error(`Failed to load image: ${imagePath}`));
+                        image.src = imagePath;
+                    });
+
+                    // 为每个瓦片创建缓存条目
+                    for (let i = 0; i < tileset.tileCount; i++) {
+                        const gid = tileset.firstGid + i;
+                        this.tilesetImages.set(gid, {
+                            image,
+                            tileWidth: tileset.tileWidth,
+                            tileHeight: tileset.tileHeight,
+                            columns: tileset.columns,
+                            firstGid: tileset.firstGid,
+                        });
+                    }
+
+                    console.log(`[Game] Loaded tileset ${tileset.name}: ${tileset.tileCount} tiles`);
+                } catch (error) {
+                    console.error(`[Game] Failed to load tileset ${tileset.name}:`, error);
+                }
+            })());
+        }
+
+        await Promise.all(loadPromises);
+    }
+
+    /**
+     * 查找碰撞瓦片（GID > 0 的通常是障碍物）
+     */
+    private findSolidTiles(): number[] {
+        if (!this.mapData) return [];
+
+        const solidGids = new Set<number>();
+
+        // 遍历所有层，找到非零 GID（假设它们是碰撞物体）
+        for (const layer of this.mapData.tileLayers) {
+            for (const gid of layer.data) {
+                if (gid > 0) {
+                    solidGids.add(gid);
+                }
+            }
+        }
+
+        console.log(`[Game] Found ${solidGids.size} solid tiles`);
+        return Array.from(solidGids);
+    }
+
+    /**
      * 创建测试 NPC
      */
     private createTestNPCs(): void {
@@ -228,7 +645,7 @@ class OpenClawGame extends Game {
         const villagerDialogues: NPCDialogue[] = [
             {
                 id: 'greeting',
-                text: '你好，旅行者！欢迎来到我们的村庄。',
+                text: '你好，旅行者！欢迎来到 Azure Town。',
                 next: 'ask_help',
             },
             {
@@ -241,7 +658,7 @@ class OpenClawGame extends Game {
             },
             {
                 id: 'about_village',
-                text: '我们是一个和平的小村庄，这里有许多有趣的传说...',
+                text: '这是一个和平的小镇，位于 Tuxemon 世界的重要位置。',
                 next: 'goodbye',
             },
             {
@@ -253,10 +670,10 @@ class OpenClawGame extends Game {
         npcManager.addNPC({
             id: 'villager1',
             name: '村长',
-            tileX: 5,
-            tileY: 5,
-            x: 5 * this.tileWidth,
-            y: 5 * this.tileHeight,
+            tileX: 8,
+            tileY: 8,
+            x: 8 * this.tileWidth,
+            y: 8 * this.tileHeight,
             tileWidth: this.tileWidth,
             tileHeight: this.tileHeight,
             direction: Direction.DOWN,
@@ -272,7 +689,7 @@ class OpenClawGame extends Game {
             customData: {},
             visible: true,
             interactable: true,
-            collisionRadius: 12,
+            collisionRadius: 8,
             usePathfinding: false,
             pathQueue: undefined,
         });
@@ -289,10 +706,10 @@ class OpenClawGame extends Game {
         npcManager.addNPC({
             id: 'merchant1',
             name: '商人',
-            tileX: 10,
-            tileY: 3,
-            x: 10 * this.tileWidth,
-            y: 3 * this.tileHeight,
+            tileX: 12,
+            tileY: 10,
+            x: 12 * this.tileWidth,
+            y: 10 * this.tileHeight,
             tileWidth: this.tileWidth,
             tileHeight: this.tileHeight,
             direction: Direction.DOWN,
@@ -307,44 +724,7 @@ class OpenClawGame extends Game {
             customData: {},
             visible: true,
             interactable: true,
-            collisionRadius: 12,
-            usePathfinding: true,
-            pathQueue: undefined,
-        });
-
-        // 巡逻的守卫
-        npcManager.addNPC({
-            id: 'guard1',
-            name: '守卫',
-            tileX: 15,
-            tileY: 2,
-            x: 15 * this.tileWidth,
-            y: 2 * this.tileHeight,
-            tileWidth: this.tileWidth,
-            tileHeight: this.tileHeight,
-            direction: Direction.LEFT,
-            behavior: NPCBehavior.PATROL,
-            interactionType: NPCInteractionType.DIALOGUE,
-            moveSpeed: 250,
-            wanderInterval: [2000, 5000],
-            pathPoints: [
-                { x: 15, y: 2, waitTime: 500 },
-                { x: 15, y: 10, waitTime: 1000 },
-                { x: 18, y: 10, waitTime: 500 },
-                { x: 18, y: 2, waitTime: 1000 },
-            ],
-            currentPathIndex: 0,
-            followDistance: 3,
-            dialogues: [
-                {
-                    id: 'guard',
-                    text: '站住！这里是村庄的入口。',
-                },
-            ],
-            customData: {},
-            visible: true,
-            interactable: true,
-            collisionRadius: 12,
+            collisionRadius: 8,
             usePathfinding: true,
             pathQueue: undefined,
         });
@@ -354,107 +734,25 @@ class OpenClawGame extends Game {
      * 创建测试场景
      */
     private createTestScenes(): void {
-        // 主地图场景
-        const mainMapData = createTestMapData();
+        if (!this.mapData) return;
+
         const mainScene: SceneData = {
-            id: 'main_map',
-            name: '主地图',
-            mapData: mainMapData,
-            teleports: [
-                {
-                    id: 'teleport_to_house',
-                    name: '进入房屋',
-                    x: 18 * this.tileWidth,
-                    y: 5 * this.tileHeight,
-                    width: this.tileWidth,
-                    height: this.tileHeight,
-                    targetMapId: 'house_interior',
-                    targetX: 2,
-                    targetY: 2,
-                    type: 'door',
-                },
-            ],
+            id: 'azure_town',
+            name: 'Azure Town',
+            mapData: this.mapData,
+            teleports: [],
             isIndoor: false,
             type: 'town',
         };
 
-        // 室内场景（房屋内部）
-        const houseMapData = this.createHouseMapData();
-        const houseScene: SceneData = {
-            id: 'house_interior',
-            name: '房屋内部',
-            mapData: houseMapData,
-            teleports: [
-                {
-                    id: 'teleport_to_main',
-                    name: '离开房屋',
-                    x: 2 * this.tileWidth,
-                    y: 4 * this.tileHeight,
-                    width: this.tileWidth,
-                    height: this.tileHeight,
-                    targetMapId: 'main_map',
-                    targetX: 18,
-                    targetY: 6,
-                    type: 'door',
-                },
-            ],
-            isIndoor: true,
-            type: 'building',
-        };
-
-        // 注册场景
         sceneManager.registerScene(mainScene);
-        sceneManager.registerScene(houseScene);
-
-        // 设置当前场景为主地图
-        sceneManager.setCurrentScene('main_map');
-    }
-
-    /**
-     * 创建房屋内部地图
-     */
-    private createHouseMapData(): TMXMapData {
-        // 5x5 的小房间
-        const HOUSE_WIDTH = 5;
-        const HOUSE_HEIGHT = 5;
-        const houseMapData = [
-            1, 1, 1, 1, 1,
-            1, 0, 0, 0, 1,
-            1, 0, 0, 0, 1,
-            1, 0, 0, 0, 1,
-            1, 1, 0, 1, 1,  // 门在底部中间
-        ];
-
-        const tileLayer: TMXTileLayer = {
-            name: 'house_floor',
-            width: HOUSE_WIDTH,
-            height: HOUSE_HEIGHT,
-            data: houseMapData,
-            properties: {},
-            visible: true,
-            opacity: 1,
-            offsetX: 0,
-            offsetY: 0,
-        };
-
-        return {
-            width: HOUSE_WIDTH,
-            height: HOUSE_HEIGHT,
-            tileWidth: this.tileWidth,
-            tileHeight: this.tileHeight,
-            renderOrder: 'right-down',
-            tileLayers: [tileLayer],
-            objectGroups: [],
-            tilesets: [],
-            properties: {},
-        };
+        sceneManager.setCurrentScene('azure_town');
     }
 
     /**
      * 绑定调试按键
      */
     private bindDebugKeys(): void {
-        // F1 切换调试信息显示
         const checkDebugKey = () => {
             if (inputManager.isPressed(KeyCode.F1 as any) || inputManager.isPressed('f1')) {
                 this.showDebugInfo = !this.showDebugInfo;
@@ -462,7 +760,6 @@ class OpenClawGame extends Game {
             }
         };
 
-        // 在 update 中检查
         const originalOnUpdate = this.onUpdate.bind(this);
         this.onUpdate = (deltaTime: number) => {
             checkDebugKey();
@@ -476,6 +773,15 @@ class OpenClawGame extends Game {
     private updateLoadingProgress(progress: { percentage: number }): void {
         if (this.loadingText) {
             this.loadingText.textContent = `加载中... ${Math.floor(progress.percentage)}%`;
+        }
+    }
+
+    /**
+     * 更新加载文本
+     */
+    private updateLoadingText(text: string): void {
+        if (this.loadingText) {
+            this.loadingText.textContent = text;
         }
     }
 
@@ -505,6 +811,9 @@ class OpenClawGame extends Game {
         // 更新玩家
         playerController.update(deltaTime);
 
+        // 发送玩家位置更新到服务器
+        this.sendPlayerPosition();
+
         // 更新 NPC
         npcManager.update(deltaTime);
 
@@ -520,6 +829,42 @@ class OpenClawGame extends Game {
 
         // 更新摄像机位置（跟随玩家）
         this.updateCamera();
+
+        // 检查挑战输入（Z 键）
+        this.checkChallengeInput();
+    }
+
+    /**
+     * 检查挑战输入
+     */
+    private checkChallengeInput(): void {
+        if (!this.connectedToMMO || this.inBattle) return;
+
+        // 检查 Z 键按下
+        if (inputManager.isPressed("z")) {
+            const playerPos = playerController.getTilePosition();
+
+            // 找到最近的玩家
+            let nearestPlayer: OtherPlayer | null = null;
+            let nearestDistance = 3; // 最大距离
+
+            for (const player of this.otherPlayers.values()) {
+                const distance = Math.abs(playerPos.tileX - player.x / this.tileWidth) +
+                                Math.abs(playerPos.tileY - player.y / this.tileHeight);
+                if (distance <= nearestDistance) {
+                    if (!nearestPlayer || distance < nearestDistance) {
+                        nearestPlayer = player;
+                        nearestDistance = distance;
+                    }
+                }
+            }
+
+            if (nearestPlayer) {
+                this.sendChallenge(nearestPlayer.id);
+            } else {
+                this.showToast('附近没有可挑战的玩家');
+            }
+        }
     }
 
     /**
@@ -530,28 +875,21 @@ class OpenClawGame extends Game {
         const screenWidth = this.getWidth();
         const screenHeight = this.getHeight();
 
-        // 计算地图边界
         const mapWidth = this.mapData!.width * this.tileWidth;
         const mapHeight = this.mapData!.height * this.tileHeight;
 
-        // 摄像机居中于玩家
         this.cameraX = playerPos.x - screenWidth / 2 + this.tileWidth / 2;
         this.cameraY = playerPos.y - screenHeight / 2 + this.tileHeight / 2;
 
-        // 限制摄像机在地图范围内
         this.cameraX = Math.max(0, Math.min(this.cameraX, mapWidth - screenWidth));
         this.cameraY = Math.max(0, Math.min(this.cameraY, mapHeight - screenHeight));
 
-        // 如果地图小于屏幕，居中显示
         if (mapWidth < screenWidth) {
             this.cameraX = (mapWidth - screenWidth) / 2;
         }
         if (mapHeight < screenHeight) {
             this.cameraY = (mapHeight - screenHeight) / 2;
         }
-
-        // 设置渲染器视口（暂时注释掉，TileRenderer 需要单独配置）
-        // tileRenderer.setViewport(this.cameraX, this.cameraY, screenWidth, screenHeight);
     }
 
     /**
@@ -563,12 +901,11 @@ class OpenClawGame extends Game {
             return;
         }
 
-        // 清空画布
-        ctx.fillStyle = '#16213e';
+        // 清空画布 - 使用深蓝色背景
+        ctx.fillStyle = '#1a1a2e';
         ctx.fillRect(0, 0, this.getWidth(), this.getHeight());
 
         if (!this.mapData) {
-            // 未加载地图时显示提示
             ctx.fillStyle = '#ffffff';
             ctx.font = '24px Arial';
             ctx.textAlign = 'center';
@@ -576,8 +913,11 @@ class OpenClawGame extends Game {
             return;
         }
 
-        // 渲染地图
+        // 渲染地图（使用真实瓦片图片）
         this.renderMap(ctx);
+
+        // 渲染其他玩家（MMO）
+        this.renderOtherPlayers(ctx);
 
         // 渲染 NPC
         this.renderNPCs(ctx);
@@ -594,6 +934,11 @@ class OpenClawGame extends Game {
         // 渲染场景切换效果
         sceneManager.render(ctx, this.getWidth(), this.getHeight());
 
+        // 渲染战斗界面
+        if (this.inBattle) {
+            this.renderBattleUI(ctx);
+        }
+
         // 渲染调试信息
         if (this.showDebugInfo) {
             this.renderDebugInfo(ctx);
@@ -601,48 +946,45 @@ class OpenClawGame extends Game {
     }
 
     /**
-     * 渲染地图
+     * 渲染地图 - 使用真实瓦片图片
      */
     private renderMap(ctx: CanvasRenderingContext2D): void {
-        const mapLayer = this.mapData!.tileLayers[0];
-        if (!mapLayer || !mapLayer.visible) return;
+        for (const layer of this.mapData!.tileLayers) {
+            if (!layer.visible) continue;
 
-        const visibleLeft = Math.floor(this.cameraX / this.tileWidth);
-        const visibleTop = Math.floor(this.cameraY / this.tileHeight);
-        const visibleRight = Math.ceil((this.cameraX + this.getWidth()) / this.tileWidth);
-        const visibleBottom = Math.ceil((this.cameraY + this.getHeight()) / this.tileHeight);
+            const visibleLeft = Math.floor(this.cameraX / this.tileWidth);
+            const visibleTop = Math.floor(this.cameraY / this.tileHeight);
+            const visibleRight = Math.ceil((this.cameraX + this.getWidth()) / this.tileWidth);
+            const visibleBottom = Math.ceil((this.cameraY + this.getHeight()) / this.tileHeight);
 
-        for (let row = Math.max(0, visibleTop); row < Math.min(this.mapData!.height, visibleBottom); row++) {
-            for (let col = Math.max(0, visibleLeft); col < Math.min(this.mapData!.width, visibleRight); col++) {
-                const index = row * mapLayer.width + col;
-                const gid = mapLayer.data[index];
+            for (let row = Math.max(0, visibleTop); row < Math.min(this.mapData!.height, visibleBottom); row++) {
+                for (let col = Math.max(0, visibleLeft); col < Math.min(this.mapData!.width, visibleRight); col++) {
+                    const index = row * layer.width + col;
+                    const gid = layer.data[index];
 
-                const x = col * this.tileWidth - this.cameraX;
-                const y = row * this.tileHeight - this.cameraY;
+                    if (gid === 0) continue; // 空瓦片
 
-                // 根据瓦片类型渲染不同颜色
-                switch (gid) {
-                    case 0: // 可通行
-                        ctx.fillStyle = '#2a3f5f';
-                        break;
-                    case 1: // 墙壁
-                        ctx.fillStyle = '#4a5568';
-                        break;
-                    case 2: // 水面
-                        ctx.fillStyle = '#2b6cb0';
-                        break;
-                    case 3: // 草地
-                        ctx.fillStyle = '#48bb78';
-                        break;
-                    default:
-                        ctx.fillStyle = '#2a3f5f';
+                    const tilesetImage = this.tilesetImages.get(gid);
+                    if (!tilesetImage) continue;
+
+                    const x = col * this.tileWidth - this.cameraX;
+                    const y = row * this.tileHeight - this.cameraY;
+
+                    // 计算瓦片在图片中的位置
+                    const tileIndex = gid - tilesetImage.firstGid;
+                    const tileRow = Math.floor(tileIndex / tilesetImage.columns);
+                    const tileCol = tileIndex % tilesetImage.columns;
+
+                    const srcX = tileCol * tilesetImage.tileWidth;
+                    const srcY = tileRow * tilesetImage.tileHeight;
+
+                    // 绘制瓦片
+                    ctx.drawImage(
+                        tilesetImage.image,
+                        srcX, srcY, tilesetImage.tileWidth, tilesetImage.tileHeight,
+                        x, y, this.tileWidth, this.tileHeight
+                    );
                 }
-
-                ctx.fillRect(x, y, this.tileWidth, this.tileHeight);
-
-                // 绘制瓦片边框
-                ctx.strokeStyle = 'rgba(255, 255, 255, 0.1)';
-                ctx.strokeRect(x, y, this.tileWidth, this.tileHeight);
             }
         }
     }
@@ -661,21 +1003,19 @@ class OpenClawGame extends Game {
         const y = playerPos.y - this.cameraY;
         const jumpOffset = playerFullPos.jumpOffset;
 
-        // 绘制玩家（简单矩形，实际应该使用精灵图）
         ctx.save();
 
         // 跳跃时的阴影
         if (isJumping) {
             ctx.fillStyle = 'rgba(0, 0, 0, 0.2)';
             ctx.beginPath();
-            ctx.ellipse(x + this.tileWidth / 2, y + this.tileHeight - 2, 12, 6, 0, 0, Math.PI * 2);
+            ctx.ellipse(x + this.tileWidth / 2, y + this.tileHeight - 2, 10, 5, 0, 0, Math.PI * 2);
             ctx.fill();
         }
 
-        // 应用跳跃偏移
         const renderY = y + jumpOffset;
 
-        // 玩家身体 - 跑步时颜色更深
+        // 玩家身体 - 使用蓝色
         ctx.fillStyle = isRunning ? '#2563eb' : '#4299e1';
         ctx.fillRect(x + 4, renderY + 4, this.tileWidth - 8, this.tileHeight - 8);
 
@@ -714,23 +1054,10 @@ class OpenClawGame extends Game {
 
         // 眼睛
         ctx.fillStyle = '#ffffff';
-        ctx.fillRect(x + 10, renderY + 12, 4, 4);
-        ctx.fillRect(x + 18, renderY + 12, 4, 4);
+        ctx.fillRect(x + 8, renderY + 10, 3, 3);
+        ctx.fillRect(x + 14, renderY + 10, 3, 3);
 
-        // 跑步时的呼吸/奔跑效果（简单的缩放）
-        if (isRunning) {
-            const breatheScale = 1 + Math.sin(Date.now() / 100) * 0.05;
-            ctx.strokeStyle = 'rgba(255, 255, 255, 0.3)';
-            ctx.lineWidth = 2;
-            ctx.strokeRect(
-                x + 4 - (breatheScale - 1) * 8,
-                renderY + 4 - (breatheScale - 1) * 8,
-                this.tileWidth - 8 + (breatheScale - 1) * 16,
-                this.tileHeight - 8 + (breatheScale - 1) * 16
-            );
-        }
-
-        ctx.restore();
+            ctx.restore();
     }
 
     /**
@@ -750,16 +1077,16 @@ class OpenClawGame extends Game {
             // NPC 身体
             switch (npc.interactionType) {
                 case NPCInteractionType.DIALOGUE:
-                    ctx.fillStyle = '#48bb78'; // 村民 - 绿色
+                    ctx.fillStyle = '#48bb78';
                     break;
                 case NPCInteractionType.SHOP:
-                    ctx.fillStyle = '#f6e05e'; // 商人 - 黄色
+                    ctx.fillStyle = '#f6e05e';
                     break;
                 case NPCInteractionType.QUEST:
-                    ctx.fillStyle = '#9f7aea'; // 任务 NPC - 紫色
+                    ctx.fillStyle = '#9f7aea';
                     break;
                 default:
-                    ctx.fillStyle = '#a0aec0'; // 默认 - 灰色
+                    ctx.fillStyle = '#a0aec0';
             }
 
             ctx.fillRect(x + 4, y + 4, this.tileWidth - 8, this.tileHeight - 8);
@@ -786,8 +1113,8 @@ class OpenClawGame extends Game {
                     break;
             }
 
-            ctx.fillRect(dirX - 6 + eyeOffsetX, dirY - 6 + eyeOffsetY, 4, 4);
-            ctx.fillRect(dirX + 2 + eyeOffsetX, dirY - 6 + eyeOffsetY, 4, 4);
+            ctx.fillRect(dirX - 5 + eyeOffsetX, dirY - 5 + eyeOffsetY, 3, 3);
+            ctx.fillRect(dirX + 2 + eyeOffsetX, dirY - 5 + eyeOffsetY, 3, 3);
 
             // 绘制名字标签
             ctx.fillStyle = '#ffffff';
@@ -808,19 +1135,135 @@ class OpenClawGame extends Game {
     }
 
     /**
+     * 渲染其他玩家（MMO）
+     */
+    private renderOtherPlayers(ctx: CanvasRenderingContext2D): void {
+        for (const player of this.otherPlayers.values()) {
+            const x = player.x - this.cameraX;
+            const y = player.y - this.cameraY;
+
+            // 检查是否在屏幕范围内
+            if (x < -this.tileWidth || x > this.getWidth() ||
+                y < -this.tileHeight || y > this.getHeight()) {
+                continue;
+            }
+
+            ctx.save();
+
+            // 玩家身体 - 使用橙色（与玩家蓝色区分）
+            ctx.fillStyle = player.isBot ? '#f59e0b' : '#f97316';
+            ctx.fillRect(x + 4, y + 4, this.tileWidth - 8, this.tileHeight - 8);
+
+            // 绘制方向指示
+            ctx.fillStyle = '#d97706';
+            switch (player.direction) {
+                case Direction.UP:
+                    ctx.beginPath();
+                    ctx.moveTo(x + this.tileWidth / 2, y + 4);
+                    ctx.lineTo(x + this.tileWidth / 2 - 4, y + 12);
+                    ctx.lineTo(x + this.tileWidth / 2 + 4, y + 12);
+                    ctx.fill();
+                    break;
+                case Direction.DOWN:
+                    ctx.beginPath();
+                    ctx.moveTo(x + this.tileWidth / 2, y + this.tileHeight - 4);
+                    ctx.lineTo(x + this.tileWidth / 2 - 4, y + this.tileHeight - 12);
+                    ctx.lineTo(x + this.tileWidth / 2 + 4, y + this.tileHeight - 12);
+                    ctx.fill();
+                    break;
+                case Direction.LEFT:
+                    ctx.beginPath();
+                    ctx.moveTo(x + 4, y + this.tileHeight / 2);
+                    ctx.lineTo(x + 12, y + this.tileHeight / 2 - 4);
+                    ctx.lineTo(x + 12, y + this.tileHeight / 2 + 4);
+                    ctx.fill();
+                    break;
+                case Direction.RIGHT:
+                    ctx.beginPath();
+                    ctx.moveTo(x + this.tileWidth - 4, y + this.tileHeight / 2);
+                    ctx.lineTo(x + this.tileWidth - 12, y + this.tileHeight / 2 - 4);
+                    ctx.lineTo(x + this.tileWidth - 12, y + this.tileHeight / 2 + 4);
+                    ctx.fill();
+                    break;
+            }
+
+            // 眼睛
+            ctx.fillStyle = '#ffffff';
+            ctx.fillRect(x + 8, y + 10, 3, 3);
+            ctx.fillRect(x + 14, y + 10, 3, 3);
+
+            // 绘制名字标签
+            ctx.fillStyle = '#fbbf24';
+            ctx.font = '10px Arial';
+            ctx.textAlign = 'center';
+            const nameText = player.isBot ? `${player.name} (Bot Lv.${player.level})` : player.name;
+            ctx.fillText(nameText, x + this.tileWidth / 2, y - 2);
+
+            // 挑战按钮（如果在附近且未战斗中）
+            const playerPos = playerController.getTilePosition();
+            const distance = Math.abs(playerPos.tileX - player.x / this.tileWidth) +
+                            Math.abs(playerPos.tileY - player.y / this.tileHeight);
+
+            if (distance <= 3 && !this.inBattle && this.connectedToMMO) {
+                ctx.fillStyle = '#ef4444';
+                ctx.fillRect(x, y - 18, this.tileWidth, 14);
+                ctx.fillStyle = '#ffffff';
+                ctx.font = '9px Arial';
+                ctx.textAlign = 'center';
+                ctx.fillText('[挑战]', x + this.tileWidth / 2, y - 8);
+
+                // 如果选中了该玩家，用高亮显示
+                if (this.selectedPlayerId === player.id) {
+                    ctx.strokeStyle = '#ffffff';
+                    ctx.lineWidth = 2;
+                    ctx.strokeRect(x - 2, y - 20, this.tileWidth + 4, this.tileHeight + 4);
+                }
+            }
+
+            ctx.restore();
+        }
+    }
+
+    /**
+     * 渲染战斗 UI
+     */
+    private renderBattleUI(ctx: CanvasRenderingContext2D): void {
+        const width = this.getWidth();
+        const height = this.getHeight();
+
+        // 半透明遮罩
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+        ctx.fillRect(0, 0, width, height);
+
+        // 战斗界面边框
+        ctx.strokeStyle = '#ef4444';
+        ctx.lineWidth = 3;
+        ctx.strokeRect(50, 50, width - 100, height - 100);
+
+        // 战斗标题
+        ctx.fillStyle = '#ef4444';
+        ctx.font = 'bold 24px Arial';
+        ctx.textAlign = 'center';
+        ctx.fillText('⚔️ PvP 战斗 ⚔️', width / 2, 100);
+
+        // 占位战斗内容
+        ctx.fillStyle = '#ffffff';
+        ctx.font = '16px Arial';
+        ctx.fillText('战斗进行中...', width / 2, height / 2);
+    }
+
+    /**
      * 渲染调试信息
      */
     private renderDebugInfo(ctx: CanvasRenderingContext2D): void {
         const playerPos = playerController.getTilePosition();
         const pixelPos = playerController.getPixelPosition();
         const direction = playerController.getFacingDirection();
-        const collisionStats = collisionManager.getStats();
         const nearbyNPCs = npcManager.getNearbyNPCs(2);
-        const eventStats = eventSystem.getStats();
 
         ctx.save();
         ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
-        ctx.fillRect(10, 10, 250, 200);
+        ctx.fillRect(10, 10, 280, 260);
 
         ctx.fillStyle = '#48bb78';
         ctx.font = '12px monospace';
@@ -829,26 +1272,31 @@ class OpenClawGame extends Game {
         let y = 30;
         const lineHeight = 16;
 
-        ctx.fillText(`=== Debug Info ===`, 20, y); y += lineHeight;
-        ctx.fillText(`FPS: ${this.getTargetFPS()}`, 20, y); y += lineHeight;
-        ctx.fillText(`Player Tile: (${playerPos.tileX}, ${playerPos.tileY})`, 20, y); y += lineHeight;
-        ctx.fillText(`Player Pixel: (${Math.round(pixelPos.x)}, ${Math.round(pixelPos.y)})`, 20, y); y += lineHeight;
-        ctx.fillText(`Direction: ${direction}`, 20, y); y += lineHeight;
-        ctx.fillText(`State: ${playerController.getState()}`, 20, y); y += lineHeight;
-        ctx.fillText(`Running: ${playerController.isRunning() ? 'YES' : 'NO'}`, 20, y); y += lineHeight;
-        ctx.fillText(`Jumping: ${playerController.isJumping() ? 'YES' : 'NO'}`, 20, y); y += lineHeight;
-        ctx.fillText(`Jump Offset: ${playerController.getJumpOffset().toFixed(1)}px`, 20, y); y += lineHeight;
-        ctx.fillText(`Camera: (${Math.round(this.cameraX)}, ${Math.round(this.cameraY)})`, 20, y); y += lineHeight;
-        ctx.fillText(`NPC Count: ${npcManager.getAllNPCs().length}`, 20, y); y += lineHeight;
-        ctx.fillText(`Nearby NPCs: ${nearbyNPCs.length}`, 20, y); y += lineHeight;
-        ctx.fillText(`Collision Layers: ${collisionStats.collisionLayers}`, 20, y); y += lineHeight;
-        ctx.fillText(`Solid Tiles: ${collisionStats.solidTiles}`, 20, y); y += lineHeight;
-        ctx.fillText(`Dynamic Collisions: ${collisionStats.dynamicCollisions}`, 20, y); y += lineHeight;
-        ctx.fillText(`Event Triggers: ${eventStats.totalTriggers}`, 20, y); y += lineHeight;
-        ctx.fillText(`Event Variables: ${eventStats.variables}`, 20, y); y += lineHeight;
-        ctx.fillText(``, 20, y); y += lineHeight;
-        ctx.fillStyle = '#f6e05e';
-        ctx.fillText(`Nearby: ${nearbyNPCs.map(n => n.name).join(', ')}`, 20, y);
+        ctx.fillText('=== Debug Info ===', 20, y); y += lineHeight;
+        ctx.fillText('FPS: ' + this.getTargetFPS(), 20, y); y += lineHeight;
+        ctx.fillText('Player Tile: (' + playerPos.tileX + ', ' + playerPos.tileY + ')', 20, y); y += lineHeight;
+        ctx.fillText('Player Pixel: (' + Math.round(pixelPos.x) + ', ' + Math.round(pixelPos.y) + ')', 20, y); y += lineHeight;
+        ctx.fillText('Direction: ' + direction, 20, y); y += lineHeight;
+        ctx.fillText('State: ' + playerController.getState(), 20, y); y += lineHeight;
+        ctx.fillText('Running: ' + (playerController.isRunning() ? 'YES' : 'NO'), 20, y); y += lineHeight;
+        ctx.fillText('Jumping: ' + (playerController.isJumping() ? 'YES' : 'NO'), 20, y); y += lineHeight;
+        ctx.fillText('Camera: (' + Math.round(this.cameraX) + ', ' + Math.round(this.cameraY) + ')', 20, y); y += lineHeight;
+        ctx.fillText('NPC Count: ' + npcManager.getAllNPCs().length, 20, y); y += lineHeight;
+        ctx.fillText('Nearby NPCs: ' + nearbyNPCs.length, 20, y); y += lineHeight;
+        ctx.fillText('Loaded Tiles: ' + this.tilesetImages.size, 20, y); y += lineHeight;
+        ctx.fillText('Tilesets: ' + (this.mapData?.tilesets.length || 0), 20, y); y += lineHeight;
+
+        // MMO 调试信息
+        y += 8;
+        ctx.fillStyle = '#fbbf24';
+        ctx.fillText('=== MMO Info ===', 20, y); y += lineHeight;
+        ctx.fillStyle = this.connectedToMMO ? '#48bb78' : '#f87171';
+        ctx.fillText('Connected: ' + (this.connectedToMMO ? 'YES' : 'NO'), 20, y); y += lineHeight;
+        ctx.fillStyle = '#ffffff';
+        ctx.fillText('Player ID: ' + this.playerId.substring(0, 12) + '...', 20, y); y += lineHeight;
+        ctx.fillText('Player Name: ' + this.playerName, 20, y); y += lineHeight;
+        ctx.fillText('Other Players: ' + this.otherPlayers.size, 20, y); y += lineHeight;
+        ctx.fillText('In Battle: ' + (this.inBattle ? 'YES' : 'NO'), 20, y); y += lineHeight;
 
         ctx.restore();
     }
@@ -864,14 +1312,13 @@ if (document.readyState === 'loading') {
         game.start();
     });
 } else {
-    // DOM 已经加载完成
     (async () => {
         await game.init();
         game.start();
     })();
 }
 
-// 将游戏实例和各管理器暴露到全局，方便调试
+// 将游戏实例和各管理器暴露到全局
 (window as any).game = game;
 (window as any).inputManager = inputManager;
 (window as any).collisionManager = collisionManager;

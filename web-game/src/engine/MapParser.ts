@@ -169,7 +169,7 @@ export class MapParser {
     }
 
     const xmlText = await response.text();
-    const mapData = this.parse(xmlText);
+    const mapData = await this.parse(xmlText, url);
 
     // 缓存结果
     if (useCache) {
@@ -182,8 +182,9 @@ export class MapParser {
   /**
    * 从字符串解析 TMX 地图
    * @param xmlText TMX XML 字符串
+   * @param tmxPath TMX 文件路径（用于解析外部 tileset）
    */
-  parse(xmlText: string): TMXMapData {
+  async parse(xmlText: string, tmxPath?: string): Promise<TMXMapData> {
     const parser = new DOMParser();
     const doc = parser.parseFromString(xmlText, 'application/xml');
 
@@ -218,7 +219,8 @@ export class MapParser {
     // 解析瓦片集
     const tilesetElements = mapElement.querySelectorAll(':scope > tileset');
     for (let i = 0; i < tilesetElements.length; i++) {
-      mapData.tilesets.push(this.parseTileset(tilesetElements[i]));
+      const tileset = await this.parseTileset(tilesetElements[i], tmxPath);
+      mapData.tilesets.push(tileset);
     }
 
     // 解析瓦片层
@@ -240,7 +242,83 @@ export class MapParser {
   /**
    * 解析瓦片集
    */
-  private parseTileset(element: Element): TMXTileset {
+  private async parseTileset(element: Element, tmxPath?: string): Promise<TMXTileset> {
+    // 检查是否是外部 tileset 引用
+    const source = element.getAttribute('source');
+    if (source && tmxPath) {
+      // 解析外部 TSX 文件路径
+      const baseUrl = tmxPath.substring(0, tmxPath.lastIndexOf('/'));
+      let tsxPath = source;
+
+      // 处理相对路径
+      if (source.startsWith('../')) {
+        tsxPath = baseUrl + '/' + source;
+      } else if (source.startsWith('./')) {
+        tsxPath = baseUrl + source.substring(1);
+      }
+
+      console.log(`[MapParser] 加载外部 tileset: ${tsxPath}`);
+
+      try {
+        const response = await fetch(tsxPath);
+        if (!response.ok) {
+          throw new Error(`[MapParser] 加载 TSX 失败: ${response.statusText}`);
+        }
+
+        const tsxText = await response.text();
+        const parser = new DOMParser();
+        const doc = parser.parseFromString(tsxText, 'application/xml');
+
+        const tsxElement = doc.querySelector('tileset');
+        if (!tsxElement) {
+          throw new Error('[MapParser] TSX 文件未找到 tileset 元素');
+        }
+
+        // 修正图片路径：从 gfx/tilesets/xxx.png 改为 tilesets/xxx.png
+        const imageEl = tsxElement.querySelector('image');
+        let imagePath = imageEl?.getAttribute('source') || '';
+
+        // 修正路径：将 ../gfx/tilesets/ 替换为 tilesets/
+        imagePath = imagePath.replace('../gfx/tilesets/', 'tilesets/');
+        imagePath = imagePath.replace('../tilesets/', 'tilesets/');
+
+        const firstGid = parseInt(element.getAttribute('firstgid') || '1', 10);
+
+        console.log(`[MapParser] TSX 图片路径: ${imagePath}, firstGid: ${firstGid}`);
+
+        return {
+          name: tsxElement.getAttribute('name') || '',
+          firstGid,
+          tileWidth: parseInt(tsxElement.getAttribute('tilewidth') || '32', 10),
+          tileHeight: parseInt(tsxElement.getAttribute('tileheight') || '32', 10),
+          tileCount: parseInt(tsxElement.getAttribute('tilecount') || '0', 10),
+          columns: parseInt(tsxElement.getAttribute('columns') || '0', 10),
+          image: imagePath,
+          imageWidth: parseInt(imageEl?.getAttribute('width') || '0', 10),
+          imageHeight: parseInt(imageEl?.getAttribute('height') || '0', 10),
+          margin: parseInt(tsxElement.getAttribute('margin') || '0', 10),
+          spacing: parseInt(tsxElement.getAttribute('spacing') || '0', 10),
+        };
+      } catch (error) {
+        console.error('[MapParser] 加载外部 tileset 失败:', error);
+        // 返回一个空的 tileset 以避免崩溃
+        return {
+          name: '',
+          firstGid: parseInt(element.getAttribute('firstgid') || '1', 10),
+          tileWidth: 16,
+          tileHeight: 16,
+          tileCount: 0,
+          columns: 0,
+          image: '',
+          imageWidth: 0,
+          imageHeight: 0,
+          margin: 0,
+          spacing: 0,
+        };
+      }
+    }
+
+    // 内嵌 tileset
     const imageEl = element.querySelector('image');
 
     return {

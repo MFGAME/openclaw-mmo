@@ -1,0 +1,45 @@
+    private renderDebugInfo(ctx: CanvasRenderingContext2D): void {
+        const playerPos = playerController.getTilePosition();
+        const pixelPos = playerController.getPixelPosition();
+        const direction = playerController.getFacingDirection();
+        const nearbyNPCs = npcManager.getNearbyNPCs(2);
+
+        ctx.save();
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+        ctx.fillRect(10, 10, 280, 260);
+
+        ctx.fillStyle = '#48bb78';
+        ctx.font = '12px monospace';
+        ctx.textAlign = 'left';
+
+        let y = 30;
+        const lineHeight = 16;
+
+        ctx.fillText(`=== Debug Info ===`, 20, y); y += lineHeight;
+        ctx.fillText(`FPS: ${this.getTargetFPS()}`, 20, y); y += lineHeight;
+        ctx.fillText(`Player Tile: (${playerPos.tileX}, ${playerPos.tileY})`, 20, y); y += lineHeight;
+        ctx.fillText(`Player Pixel: (${Math.round(pixelPos.x)}, ${Math.round(pixelPos.y)})`, 20, y); y += lineHeight;
+        ctx.fillText(`Direction: ${direction}`, 20, y); y += lineHeight;
+        ctx.fillText(`State: ${playerController.getState()}`, 20, y); y += lineHeight;
+        ctx.fillText(`Running: ${playerController.isRunning() ? 'YES' : 'NO'}`, 20, y); y += lineHeight;
+        ctx.fillText(`Jumping: ${playerController.isJumping() ? 'YES' : 'NO'}`, 20, y); y += lineHeight;
+        ctx.fillText(`Camera: (${Math.round(this.cameraX)}, ${Math.round(this.cameraY)})`, 20, y); y += lineHeight;
+        ctx.fillText(`NPC Count: ${npcManager.getAllNPCs().length}`, 20, y); y += lineHeight;
+        ctx.fillText(`Nearby NPCs: ${nearbyNPCs.length}`, 20, y); y += lineHeight;
+        ctx.fillText(`Loaded Tiles: ${this.tilesetImages.size}`, 20, y); y += lineHeight;
+        ctx.fillText(`Tilesets: ${this.mapData?.tilesets.length || 0}`, 20, y); y += lineHeight;
+
+        // MMO 调试信息
+        y += 8;
+        ctx.fillStyle = '#fbbf24';
+        ctx.fillText(`=== MMO Info ===`, 20, y); y += lineHeight;
+        ctx.fillStyle = this.connectedToMMO ? '#48bb78' : '#f87171';
+        ctx.fillText(`Connected: ${this.connectedToMMO ? 'YES' : 'NO'}`, 20, y); y += lineHeight;
+        ctx.fillStyle = '#ffffff';
+        ctx.fillText(`Player ID: ${this.playerId.substring(0, 12)}...`, 20, y); y += lineHeight;
+        ctx.fillText(`Player Name: ${this.playerName}`, 20, y); y += lineHeight;
+        ctx.fillText(`Other Players: ${this.otherPlayers.size}`, 20, y); y += lineHeight;
+        ctx.fillText(`In Battle: ${this.inBattle ? 'YES' : 'NO'}`, 20, y); y += lineHeight;
+
+        ctx.restore();
+    }
