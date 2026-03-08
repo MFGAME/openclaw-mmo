@@ -353,6 +353,159 @@ export class SceneManager {
   }
 
   /**
+   * 淡出到黑色（异步 Promise 版本）
+   * @param duration 淡出持续时间（秒），默认使用切换速度的倒数
+   * @returns Promise<void> 淡出完成后 resolve
+   */
+  async fadeToBlack(duration?: number): Promise<void> {
+    // 如果已经在过渡中，先等待当前过渡完成
+    if (this.isTransitioning()) {
+      await this.waitForTransitionEnd();
+    }
+
+    // 计算淡出持续时间（秒）
+    const fadeDuration = duration !== undefined ? duration : 1 / this.transitionSpeed;
+
+    return new Promise((resolve) => {
+      // 设置为淡出状态
+      this.transitionState = TransitionState.FADING_OUT;
+      this.transitionProgress = 0;
+      this.transitionSpeed = 1 / fadeDuration;
+
+      // 添加一次性回调监听淡出完成
+      const checkComplete = () => {
+        if (this.transitionProgress >= 1 || this.transitionState === TransitionState.LOADING) {
+          resolve();
+        } else if (this.transitionState !== TransitionState.FADING_OUT) {
+          // 状态异常，直接 resolve
+          resolve();
+        } else {
+          requestAnimationFrame(checkComplete);
+        }
+      };
+
+      // 启动检查循环
+      requestAnimationFrame(checkComplete);
+    });
+  }
+
+  /**
+   * 从黑色淡入（异步 Promise 版本）
+   * @param duration 淡入持续时间（秒），默认使用切换速度的倒数
+   * @returns Promise<void> 淡入完成后 resolve
+   */
+  async fadeFromBlack(duration?: number): Promise<void> {
+    // 如果已经在过渡中，先等待当前过渡完成
+    if (this.isTransitioning()) {
+      await this.waitForTransitionEnd();
+    }
+
+    // 计算淡入持续时间（秒）
+    const fadeDuration = duration !== undefined ? duration : 1 / this.transitionSpeed;
+
+    return new Promise((resolve) => {
+      // 设置为淡入状态
+      this.transitionState = TransitionState.FADING_IN;
+      this.transitionProgress = 0;
+      this.transitionSpeed = 1 / fadeDuration;
+
+      // 添加一次性回调监听淡入完成
+      const checkComplete = () => {
+        if (this.transitionProgress >= 1) {
+          this.transitionState = TransitionState.NONE;
+          this.transitionProgress = 0;
+          resolve();
+        } else if (this.transitionState !== TransitionState.FADING_IN) {
+          // 状态异常，直接 resolve
+          resolve();
+        } else {
+          requestAnimationFrame(checkComplete);
+        }
+      };
+
+      // 启动检查循环
+      requestAnimationFrame(checkComplete);
+    });
+  }
+
+  /**
+   * 过渡到指定场景（异步 Promise 版本）
+   * @param sceneId 目标场景 ID
+   * @param targetX 目标位置 X（格子坐标）
+   * @param targetY 目标位置 Y（格子坐标）
+   * @param fadeDuration 淡入淡出持续时间（秒）
+   * @returns Promise<boolean> 过渡是否成功
+   */
+  async transitionToAsync(
+    sceneId: string,
+    targetX?: number,
+    targetY?: number,
+    fadeDuration?: number
+  ): Promise<boolean> {
+    const targetScene = this.scenes.get(sceneId);
+    if (!targetScene) {
+      console.error(`[SceneManager] Scene not found: ${sceneId}`);
+      return false;
+    }
+
+    // 如果正在切换，先等待
+    if (this.isTransitioning()) {
+      await this.waitForTransitionEnd();
+    }
+
+    this.targetScene = targetScene;
+    this.targetPosition =
+      targetX !== undefined && targetY !== undefined
+        ? { x: targetX, y: targetY }
+        : null;
+
+    try {
+      // 淡出
+      await this.fadeToBlack(fadeDuration);
+
+      // 执行场景切换
+      this.performSceneChange();
+
+      // 等待一小段时间确保场景加载完成
+      await new Promise((resolve) => setTimeout(resolve, 100));
+
+      // 淡入
+      await this.fadeFromBlack(fadeDuration);
+
+      console.log(`[SceneManager] Transition to ${sceneId} completed`);
+      return true;
+    } catch (error) {
+      console.error(`[SceneManager] Transition to ${sceneId} failed:`, error);
+      this.transitionState = TransitionState.NONE;
+      this.transitionProgress = 0;
+      return false;
+    }
+  }
+
+  /**
+   * 等待当前过渡完成
+   * @returns Promise<void> 过渡完成后 resolve
+   */
+  private async waitForTransitionEnd(): Promise<void> {
+    return new Promise((resolve) => {
+      if (!this.isTransitioning()) {
+        resolve();
+        return;
+      }
+
+      const checkComplete = () => {
+        if (!this.isTransitioning()) {
+          resolve();
+        } else {
+          requestAnimationFrame(checkComplete);
+        }
+      };
+
+      requestAnimationFrame(checkComplete);
+    });
+  }
+
+  /**
    * 注册切换回调
    */
   onTransition(callback: SceneTransitionCallback): void {

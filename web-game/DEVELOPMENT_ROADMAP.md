@@ -152,11 +152,11 @@
 
 ---
 
-**最近更新：** 2026-03-08 11:07
+**最近更新：** 2026-03-08 11:20
 **本次心跳完成：**
-- ✅ PlayerController.ts - 跑步/跳跃系统增强（Shift 加速、空格跳跃、音效）
-- ✅ ShopManager.ts/ShopUI.ts - NPC 商店系统完善（购买/出售、货币集成）
-- ✅ AchievementSystem.ts/AchievementNotificationUI.ts - 成就系统实现（18 个成就、通知 UI）
+- ✅ SceneManager.ts - 场景过渡动画增强（fadeToBlack/fadeFromBlack/transitionToAsync）
+- ✅ TutorialSystem.ts/TutorialUI.ts - 游戏教程系统（5个步骤、进度保存、键盘快捷键）
+- ✅ StatusEffectUI.ts - 状态效果图标系统（35种状态、动画效果、悬停详情）
 
 ---
 
