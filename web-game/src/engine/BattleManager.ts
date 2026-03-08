@@ -20,6 +20,7 @@ import {
 import { monsterDataLoader as _monsterDataLoader } from './MonsterData';
 import { techniqueDataLoader as _techniqueDataLoader } from './TechniqueData';
 import { experienceSystem } from './ExperienceSystem';
+import { itemDataLoader } from './ItemData';
 
 /**
  * 战斗配置接口
@@ -232,7 +233,10 @@ export class BattleManager {
         break;
 
       case ActionType.ITEM:
-        // TODO: 实现道具使用
+        // 执行道具使用
+        if (action.itemId) {
+          this.executeItem(actor, action.itemId, action.targetIds);
+        }
         break;
 
       case ActionType.SWITCH:
@@ -278,6 +282,43 @@ export class BattleManager {
         });
       }
     }
+  }
+
+  /**
+   * 执行道具使用
+   */
+  private executeItem(actor: BattleUnit, itemId: string, targetIds: string[]): void {
+    if (!this.battleState) return;
+
+    // 加载道具数据
+    const item = itemDataLoader.getItem(itemId);
+    if (!item) {
+      console.warn(`[BattleManager] Item not found: ${itemId}`);
+      return;
+    }
+
+    // 获取目标
+    const target = this.findUnit(targetIds[0] || actor.id);
+    if (!target) return;
+
+    // 使用道具 - 简化版本（ItemEffectSystem 已移除）
+    // TODO: 重新实现道具效果系统
+    const result = {
+      success: true,
+      message: `使用了 ${itemDataLoader.getItem(itemId)?.name || itemId}`,
+      extraData: {},
+    };
+
+    // 触发道具使用事件
+    this.emitEvent({
+      type: 'damage',
+      sourceId: actor.id,
+      targetId: target.id,
+      itemId: itemId,
+      text: result.message,
+    });
+
+    // 注意：捕捉功能待重新实现
   }
 
   /**
