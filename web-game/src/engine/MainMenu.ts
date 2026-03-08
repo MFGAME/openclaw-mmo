@@ -167,7 +167,7 @@ export class MainMenu {
   /**
    * 处理输入
    */
-  handleInput(action: 'up' | 'down' | 'left' | 'right' | 'confirm' | 'cancel'): void {
+  handleInput(action: 'up' | 'down' | 'left' | 'right' | 'confirm' | 'cancel' | 'any'): void {
     switch (action) {
       case 'up':
         this.moveSelection(-1);

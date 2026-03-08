@@ -14,6 +14,10 @@ import { TMXMapData, TMXTileLayer } from './engine/MapParser.js';
 import { monsterDataLoader } from './engine/MonsterData.js';
 import { techniqueDataLoader } from './engine/TechniqueData.js';
 import { eventSystem } from './engine/EventSystem.js';
+import { audioManager } from './engine/AudioManager.js';
+import { itemDataLoader } from './engine/ItemData.js';
+import { titleScreen } from './engine/TitleScreen.js';
+import { bagUI } from './engine/BagUI.js';
 
 
 /**
@@ -90,6 +94,7 @@ class OpenClawGame extends Game {
 
     /** 显示调试信息 */
     private showDebugInfo = false;
+    private gameState: 'loading' | 'title' | 'playing' = 'loading';
 
     constructor() {
         super('game-canvas', 800, 600);
@@ -109,6 +114,9 @@ class OpenClawGame extends Game {
         // 初始化输入系统
         inputManager.initialize();
         console.log('[Game] Input system initialized');
+
+        await audioManager.initialize();
+        console.log('[Game] Audio manager initialized');
 
         // 创建测试地图
         this.mapData = createTestMapData();
@@ -182,6 +190,10 @@ class OpenClawGame extends Game {
             await techniqueDataLoader.loadTechniques();
             console.log('[Game] Tuxemon resources loaded');
 
+            await itemDataLoader.loadItems();
+            console.log('[Game] Item data loaded');
+            bagUI.initialize();
+
             // 加载所有资源
             if (this.resourceManager.getQueueSize() > 0) {
                 await this.resourceManager.loadAll((progress) => {
@@ -191,6 +203,10 @@ class OpenClawGame extends Game {
 
             // 隐藏加载屏幕
             this.hideLoadingScreen();
+
+            await titleScreen.initialize();
+            this.gameState = 'title';
+            console.log('[Game] Title screen initialized');
 
             console.log('Game initialized successfully');
         } catch (error) {
@@ -476,6 +492,13 @@ class OpenClawGame extends Game {
      * 更新游戏状态
      */
     protected onUpdate(deltaTime: number): void {
+        audioManager.update(deltaTime);
+
+        if (this.gameState === 'title') {
+            titleScreen.update(deltaTime);
+            return;
+        }
+
         // 更新场景管理器
         sceneManager.update(deltaTime);
 
@@ -535,6 +558,11 @@ class OpenClawGame extends Game {
      * 渲染游戏画面
      */
     protected onRender(ctx: CanvasRenderingContext2D): void {
+        if (this.gameState === 'title') {
+            titleScreen.render(ctx, this.getWidth(), this.getHeight());
+            return;
+        }
+
         // 清空画布
         ctx.fillStyle = '#16213e';
         ctx.fillRect(0, 0, this.getWidth(), this.getHeight());
@@ -855,3 +883,7 @@ if (document.readyState === 'loading') {
 (window as any).eventSystem = eventSystem;
 (window as any).monsterDataLoader = monsterDataLoader;
 (window as any).techniqueDataLoader = techniqueDataLoader;
+(window as any).audioManager = audioManager;
+(window as any).itemDataLoader = itemDataLoader;
+(window as any).titleScreen = titleScreen;
+(window as any).bagUI = bagUI;

@@ -1,4 +1,4 @@
-# OpenClaw MMO - 开发任务（2026-03-08 08:32）
+# OpenClaw MMO - 开发任务（2026-03-08 08:48）
 
 ## 📋 任务列表
 
@@ -84,6 +84,7 @@
 3. **完整功能实现** - 不偷工减料
 4. **遇到编译错误必须修复** - 不能停止
 5. **必须确保 `npm run build` 编译通过** - 验收标准
+6. **测试验收** - 确保功能正常
 
 ---
 
@@ -92,10 +93,10 @@
 完成后运行：
 
 ```bash
-C:\Users\Administrator\AppData\Roaming\npm\openclaw.cmd system event --text "Done: 道具资源完整加载、音乐/音效系统、游戏主菜单系统 - 美术资源进度 50%" --mode now
+C:\Users\Administrator\AppData\Roaming\npm\openclaw.cmd system event --text "Done: 道具资源完整加载、音乐/音效资源加载、游戏启动器/主菜单系统 - 美术资源提升至 50%" --mode now
 ```
 
 ---
 
-**创建时间**: 2026-03-08 08:32
-**优先级**: P0 (道具+音频) + P1 (主菜单)
+**创建时间**: 2026-03-08 08:48
+**优先级**: P0 (资源) + P1 (启动系统)
