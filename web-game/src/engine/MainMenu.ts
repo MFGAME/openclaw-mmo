@@ -5,6 +5,8 @@
  * - 菜单选项（开始游戏、继续游戏、设置、退出）
  * - 菜单导航
  * - 菜单动画效果
+ * - 存档检查和继续游戏
+ * - 操作确认对话框
  */
 
 /**
@@ -131,14 +133,41 @@ export class MainMenu {
    * 检查是否有存档
    */
   private checkSaveFile(): void {
-    // TODO: 实现存档检查
-    // 暂时设为 false
-    this.hasSaveFile = false;
+    try {
+      const { saveManager } = require('./SaveManager');
+      const slotInfo = saveManager.getSlotInfo();
 
-    // 更新"继续游戏"选项的可用状态
-    const continueOption = this.options.find(opt => opt.id === MainMenuAction.CONTINUE);
-    if (continueOption) {
-      continueOption.enabled = this.hasSaveFile;
+      // 查找最新的存档
+      let hasSave = false;
+      let latestTime = 0;
+
+      for (const slot of slotInfo) {
+        if (slot.hasData && slot.timestamp > latestTime) {
+          hasSave = true;
+          latestTime = slot.timestamp;
+        }
+      }
+
+      this.hasSaveFile = hasSave;
+
+      // 更新"继续游戏"选项的可用状态和显示
+      const continueOption = this.options.find(opt => opt.id === MainMenuAction.CONTINUE);
+      if (continueOption) {
+        continueOption.enabled = this.hasSaveFile;
+        if (this.hasSaveFile) {
+          const date = new Date(latestTime);
+          const dateStr = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+          const timeStr = `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
+          continueOption.text = `继续游戏 (${dateStr} ${timeStr})`;
+        } else {
+          continueOption.text = '继续游戏';
+        }
+      }
+
+      console.log(`[MainMenu] 存档检查完成: ${this.hasSaveFile ? '有存档' : '无存档'}`);
+    } catch (error) {
+      console.warn('[MainMenu] 存档检查失败:', error);
+      this.hasSaveFile = false;
     }
   }
 
@@ -148,6 +177,8 @@ export class MainMenu {
   show(): void {
     this.visible = true;
     this.animationProgress = 0;
+    // 重新检查存档
+    this.checkSaveFile();
   }
 
   /**
@@ -163,6 +194,23 @@ export class MainMenu {
   isVisible(): boolean {
     return this.visible;
   }
+
+  /**
+   * 获取待确认的操作
+   */
+  getPendingAction(): MainMenuAction | null {
+    return this.pendingAction;
+  }
+
+  /**
+   * 清除待确认的操作
+   */
+  clearPendingAction(): void {
+    this.pendingAction = null;
+  }
+
+  /** 等待确认的操作 */
+  private pendingAction: MainMenuAction | null = null;
 
   /**
    * 处理输入
@@ -198,13 +246,24 @@ export class MainMenu {
   private moveSelection(delta: number): void {
     const newIndex = this.selectedIndex + delta;
 
-    // 循环选择
-    if (newIndex < 0) {
-      this.selectedIndex = this.options.length - 1;
-    } else if (newIndex >= this.options.length) {
-      this.selectedIndex = 0;
-    } else {
-      this.selectedIndex = newIndex;
+    // 循环选择，但跳过不可用的选项
+    let attempts = 0;
+    let validIndex = newIndex;
+
+    while (attempts < this.options.length) {
+      if (validIndex < 0) {
+        validIndex = this.options.length - 1;
+      } else if (validIndex >= this.options.length) {
+        validIndex = 0;
+      }
+
+      if (this.options[validIndex].enabled) {
+        this.selectedIndex = validIndex;
+        break;
+      }
+
+      validIndex += delta;
+      attempts++;
     }
 
     // 播放选择音效
@@ -218,16 +277,61 @@ export class MainMenu {
     const selectedOption = this.options[this.selectedIndex];
 
     if (selectedOption.enabled) {
-      // 播放确认音效
-      this.playConfirmSound();
+      // 检查是否需要确认
+      const { confirmDialog, ConfirmAction } = require('./ConfirmDialog');
 
-      // 触发回调
-      if (this.onAction) {
-        this.onAction(selectedOption.id);
+      if (selectedOption.id === MainMenuAction.NEW_GAME && this.hasSaveFile) {
+        // 有存档时，开始新游戏需要确认
+        this.pendingAction = MainMenuAction.NEW_GAME;
+        confirmDialog.show(
+          '确认开始新游戏',
+          '开始新游戏将覆盖现有存档。确定要继续吗？',
+          (action: typeof ConfirmAction[keyof typeof ConfirmAction]) => {
+            this.handleConfirmAction(action);
+          },
+          { confirmText: '确定', cancelText: '取消' }
+        );
+      } else if (selectedOption.id === MainMenuAction.QUIT) {
+        // 退出游戏需要确认
+        this.pendingAction = MainMenuAction.QUIT;
+        confirmDialog.show(
+          '确认退出游戏',
+          '确定要退出游戏吗？未保存的进度将会丢失。',
+          (action: typeof ConfirmAction[keyof typeof ConfirmAction]) => {
+            this.handleConfirmAction(action);
+          },
+          { confirmText: '退出', cancelText: '取消' }
+        );
+      } else {
+        // 其他操作直接执行
+        this.playConfirmSound();
+        this.triggerAction(selectedOption.id);
       }
     } else {
       // 播放错误音效
       this.playErrorSound();
+    }
+  }
+
+  /**
+   * 处理确认对话框操作
+   */
+  private handleConfirmAction(action: import('./ConfirmDialog').ConfirmAction): void {
+    if (action === 'confirm' && this.pendingAction) {
+      this.playConfirmSound();
+      this.triggerAction(this.pendingAction);
+    } else {
+      this.playSelectSound(); // 取消时播放选择音效
+    }
+    this.pendingAction = null;
+  }
+
+  /**
+   * 触发菜单操作
+   */
+  private triggerAction(action: MainMenuAction): void {
+    if (this.onAction) {
+      this.onAction(action);
     }
   }
 
@@ -415,7 +519,7 @@ export class MainMenu {
    */
   private playSelectSound(): void {
     const { audioManager } = require('./AudioManager');
-    audioManager.playSFX('menu_select');
+    audioManager.playSFXLegacy('menu_select');
   }
 
   /**
@@ -423,7 +527,7 @@ export class MainMenu {
    */
   private playConfirmSound(): void {
     const { audioManager } = require('./AudioManager');
-    audioManager.playSFX('menu_confirm');
+    audioManager.playSFXLegacy('menu_confirm');
   }
 
   /**
@@ -431,7 +535,7 @@ export class MainMenu {
    */
   private playErrorSound(): void {
     const { audioManager } = require('./AudioManager');
-    audioManager.playSFX('menu_error');
+    audioManager.playSFXLegacy('menu_error');
   }
 
   /**

@@ -4,7 +4,9 @@
  * 负责管理游戏中的所有音频播放，包括：
  * - BGM（背景音乐）播放、循环、切换、淡入淡出
  * - 音效播放（技能、脚步、UI等）
- * - 音量控制和静音功能
+ * - 语音播放
+ * - 音效优先级系统（避免音效重叠）
+ * - 音量分组控制（BGM/SFX/Voice）
  * - 音频设置持久化（localStorage）
  * - Web Audio API 音频上下文管理
  */
@@ -17,6 +19,23 @@ export enum AudioType {
   BGM = 'BGM',
   /** 音效 */
   SFX = 'SFX',
+  /** 语音 */
+  VOICE = 'VOICE',
+}
+
+/**
+ * 音效优先级枚举
+ * 优先级数值越大，优先级越高
+ */
+export enum SFXPriority {
+  /** 低优先级 - 背景音效、脚步声等 */
+  LOW = 0,
+  /** 中优先级 - 普通技能、UI音效等 */
+  MEDIUM = 1,
+  /** 高优先级 - 重要事件、特殊技能等 */
+  HIGH = 2,
+  /** 最高优先级 - 紧急警告、关键音效等 */
+  CRITICAL = 3,
 }
 
 /**
@@ -63,6 +82,12 @@ interface SFXInfo {
   element: HTMLAudioElement;
   /** 播放时间戳 */
   startTime: number;
+  /** 音效优先级 */
+  priority: SFXPriority;
+  /** 音效类型 */
+  type: AudioType;
+  /** 音量倍率 */
+  volumeMultiplier: number;
 }
 
 /**
@@ -73,6 +98,8 @@ export interface AudioSettings {
   bgmVolume: number;
   /** 音效音量 (0-1) */
   sfxVolume: number;
+  /** 语音音量 (0-1) */
+  voiceVolume: number;
   /** 是否静音 */
   muted: boolean;
 }
@@ -85,14 +112,32 @@ export interface AudioManagerConfig {
   defaultBGMVolume: number;
   /** 默认音效音量 (0-1) */
   defaultSFXVolume: number;
+  /** 默认语音音量 (0-1) */
+  defaultVoiceVolume: number;
   /** 淡入/淡出时长（毫秒） */
   fadeDuration: number;
   /** 同时播放的最大音效数 */
   maxConcurrentSFX: number;
+  /** 同时播放的最大语音数 */
+  maxConcurrentVoice: number;
   /** 是否启用设置持久化 */
   enablePersistence: boolean;
   /** localStorage 存储键名 */
   storageKey: string;
+}
+
+/**
+ * 音效播放选项
+ */
+export interface SFXOptions {
+  /** 播放音量（覆盖默认值） */
+  volume?: number;
+  /** 音调（倍率，默认1.0） */
+  pitch?: number;
+  /** 音效优先级 */
+  priority?: SFXPriority;
+  /** 音效类型 */
+  type?: AudioType;
 }
 
 /**
@@ -113,6 +158,9 @@ export class AudioManager {
   /** 音效音量 */
   private sfxVolume: number;
 
+  /** 语音音量 */
+  private voiceVolume: number;
+
   /** 是否静音 */
   private muted: boolean;
 
@@ -122,11 +170,17 @@ export class AudioManager {
   /** 同时播放的最大音效数 */
   private maxConcurrentSFX: number;
 
-  /** 当前播放的音效列表 */
+  /** 同时播放的最大语音数 */
+  private maxConcurrentVoice: number;
+
+  /** 当前播放的音效/语音列表 */
   private playingSFX: SFXInfo[] = [];
 
   /** 音效预加载缓存 */
   private sfxCache: Map<string, HTMLAudioElement> = new Map();
+
+  /** 语音预加载缓存 */
+  private voiceCache: Map<string, HTMLAudioElement> = new Map();
 
   /** 预加载的 BGM 缓存 */
   private bgmCache: Map<string, HTMLAudioElement> = new Map();
@@ -146,8 +200,10 @@ export class AudioManager {
   private constructor(config: AudioManagerConfig = {
     defaultBGMVolume: 0.6,
     defaultSFXVolume: 0.8,
+    defaultVoiceVolume: 0.9,
     fadeDuration: 1000,
     maxConcurrentSFX: 10,
+    maxConcurrentVoice: 3,
     enablePersistence: true,
     storageKey: 'openclaw-audio-settings',
   }) {
@@ -158,16 +214,20 @@ export class AudioManager {
     if (savedSettings) {
       this.bgmVolume = savedSettings.bgmVolume;
       this.sfxVolume = savedSettings.sfxVolume;
+      // 兼容旧版本设置
+      this.voiceVolume = savedSettings.voiceVolume ?? config.defaultVoiceVolume;
       this.muted = savedSettings.muted;
       console.log('[AudioManager] 从 localStorage 加载音频设置');
     } else {
       this.bgmVolume = config.defaultBGMVolume;
       this.sfxVolume = config.defaultSFXVolume;
+      this.voiceVolume = config.defaultVoiceVolume;
       this.muted = false;
     }
 
     this.fadeDuration = config.fadeDuration;
     this.maxConcurrentSFX = config.maxConcurrentSFX;
+    this.maxConcurrentVoice = config.maxConcurrentVoice;
   }
 
   /**
@@ -271,6 +331,7 @@ export class AudioManager {
       const settings: AudioSettings = {
         bgmVolume: this.bgmVolume,
         sfxVolume: this.sfxVolume,
+        voiceVolume: this.voiceVolume,
         muted: this.muted,
       };
 
@@ -288,6 +349,7 @@ export class AudioManager {
     return {
       bgmVolume: this.bgmVolume,
       sfxVolume: this.sfxVolume,
+      voiceVolume: this.voiceVolume,
       muted: this.muted,
     };
   }
@@ -302,6 +364,9 @@ export class AudioManager {
     if (settings.sfxVolume !== undefined) {
       this.setSFXVolume(settings.sfxVolume);
     }
+    if (settings.voiceVolume !== undefined) {
+      this.setVoiceVolume(settings.voiceVolume);
+    }
     if (settings.muted !== undefined) {
       this.setMuted(settings.muted);
     }
@@ -315,6 +380,7 @@ export class AudioManager {
   resetSettings(): void {
     this.bgmVolume = this.config.defaultBGMVolume;
     this.sfxVolume = this.config.defaultSFXVolume;
+    this.voiceVolume = this.config.defaultVoiceVolume;
     this.muted = false;
 
     // 更新当前播放的音频音量
@@ -323,7 +389,8 @@ export class AudioManager {
     }
 
     for (const sfx of this.playingSFX) {
-      sfx.element.volume = this.getActualVolume(this.sfxVolume);
+      const baseVolume = sfx.type === AudioType.VOICE ? this.voiceVolume : this.sfxVolume;
+      sfx.element.volume = this.getActualVolume(baseVolume * sfx.volumeMultiplier);
     }
 
     this.saveSettings();
@@ -474,35 +541,66 @@ export class AudioManager {
   }
 
   /**
-   * 播放音效
+   * 播放音效（增强版 - 支持优先级和类型）
    * @param id 音效 ID（文件名不含扩展名）
-   * @param volume 播放音量（覆盖默认值）
-   * @param pitch 音调（倍率，默认1.0）
+   * @param options 播放选项
    */
-  async playSFX(id: string, volume?: number, pitch: number = 1.0): Promise<void> {
+  async playSFX(id: string, options: SFXOptions = {}): Promise<void> {
     // 确保 Web Audio API 上下文已恢复
     await this.ensureAudioContextResumed();
 
-    // 检查并发音效数量限制
-    if (this.playingSFX.length >= this.maxConcurrentSFX) {
-      console.warn('[AudioManager] Max concurrent SFX reached, skipping:', id);
-      return;
+    const {
+      volume,
+      pitch = 1.0,
+      priority = SFXPriority.MEDIUM,
+      type = AudioType.SFX,
+    } = options;
+
+    // 根据类型确定最大并发数
+    const maxConcurrent = type === AudioType.VOICE ? this.maxConcurrentVoice : this.maxConcurrentSFX;
+
+    // 检查该类型的并发数量
+    const sameTypeCount = this.playingSFX.filter(s => s.type === type).length;
+    if (sameTypeCount >= maxConcurrent) {
+      // 尝试移除优先级更低的音效
+      const lowerPrioritySFX = this.playingSFX
+        .filter(s => s.type === type && s.priority < priority)
+        .sort((a, b) => a.priority - b.priority);
+
+      if (lowerPrioritySFX.length > 0) {
+        // 移除最低优先级的音效
+        const toRemove = lowerPrioritySFX[0];
+        this.stopSFXInfo(toRemove);
+        console.log(`[AudioManager] 移除低优先级音效: ${toRemove.id} (优先级: ${toRemove.priority})`);
+      } else {
+        // 没有可移除的低优先级音效，跳过
+        console.warn(`[AudioManager] Max concurrent ${type} reached, skipping: ${id}`);
+        return;
+      }
     }
 
     // 获取或创建音效元素
-    let audioElement = this.sfxCache.get(id);
+    const cache = type === AudioType.VOICE ? this.voiceCache : this.sfxCache;
+    let audioElement = cache.get(id);
     if (!audioElement) {
-      audioElement = await this.loadSFX(id);
+      if (type === AudioType.VOICE) {
+        audioElement = await this.loadVoice(id);
+      } else {
+        audioElement = await this.loadSFX(id);
+      }
       if (!audioElement) {
-        console.error(`[AudioManager] Failed to load SFX: ${id}`);
+        console.error(`[AudioManager] Failed to load ${type}: ${id}`);
         return;
       }
-      this.sfxCache.set(id, audioElement);
+      cache.set(id, audioElement);
     }
 
     // 克隆音频元素以支持同时播放多次
     const cloneElement = audioElement.cloneNode(true) as HTMLAudioElement;
-    const playVolume = volume ?? this.sfxVolume;
+    const baseVolume = type === AudioType.VOICE ? this.voiceVolume : this.sfxVolume;
+    const playVolume = volume ?? baseVolume;
+    const volumeMultiplier = playVolume / baseVolume;
+
     cloneElement.volume = this.getActualVolume(playVolume);
     cloneElement.preservesPitch = false; // 允许音调变化
     cloneElement.playbackRate = pitch;
@@ -516,6 +614,9 @@ export class AudioManager {
         id,
         element: cloneElement,
         startTime: Date.now(),
+        priority,
+        type,
+        volumeMultiplier,
       };
       this.playingSFX.push(sfxInfo);
 
@@ -524,33 +625,71 @@ export class AudioManager {
         this.cleanupSFX(sfxInfo);
       };
 
-      console.log(`[AudioManager] Playing SFX: ${id}`);
+      console.log(`[AudioManager] Playing ${type}: ${id} (优先级: ${priority})`);
     } catch (e) {
-      console.error(`[AudioManager] Failed to play SFX: ${id}`, e);
+      console.error(`[AudioManager] Failed to play ${type}: ${id}`, e);
     }
+  }
+
+  /**
+   * 播放音效（兼容旧版接口）
+   * @param id 音效 ID（文件名不含扩展名）
+   * @param volume 播放音量（覆盖默认值）
+   * @param pitch 音调（倍率，默认1.0）
+   */
+  async playSFXLegacy(id: string, volume?: number, pitch: number = 1.0): Promise<void> {
+    return this.playSFX(id, { volume, pitch });
+  }
+
+  /**
+   * 播放语音
+   * @param id 语音 ID（文件名不含扩展名）
+   * @param options 播放选项
+   */
+  async playVoice(id: string, options: SFXOptions = {}): Promise<void> {
+    return this.playSFX(id, { ...options, type: AudioType.VOICE });
   }
 
   /**
    * 停止指定音效
    * @param id 音效 ID
+   * @param type 音效类型（可选）
    */
-  stopSFX(id: string): void {
+  stopSFX(id: string, type?: AudioType): void {
     for (const sfx of this.playingSFX) {
-      if (sfx.id === id) {
-        sfx.element.pause();
-        this.cleanupSFX(sfx);
+      if (sfx.id === id && (!type || sfx.type === type)) {
+        this.stopSFXInfo(sfx);
       }
     }
   }
 
   /**
-   * 停止所有音效
+   * 停止指定类型的所有音效
+   * @param type 音效类型
+   */
+  stopByType(type: AudioType): void {
+    for (const sfx of [...this.playingSFX]) {
+      if (sfx.type === type) {
+        this.stopSFXInfo(sfx);
+      }
+    }
+  }
+
+  /**
+   * 停止所有音效和语音
    */
   stopAllSFX(): void {
     for (const sfx of [...this.playingSFX]) {
-      sfx.element.pause();
-      this.cleanupSFX(sfx);
+      this.stopSFXInfo(sfx);
     }
+  }
+
+  /**
+   * 停止指定音效信息
+   */
+  private stopSFXInfo(sfx: SFXInfo): void {
+    sfx.element.pause();
+    this.cleanupSFX(sfx);
   }
 
   /**
@@ -560,9 +699,11 @@ export class AudioManager {
   setSFXVolume(volume: number): void {
     this.sfxVolume = Math.max(0, Math.min(1, volume));
 
-    // 更新当前播放的音效音量
+    // 更新当前播放的 SFX 音效音量
     for (const sfx of this.playingSFX) {
-      sfx.element.volume = this.getActualVolume(this.sfxVolume);
+      if (sfx.type === AudioType.SFX) {
+        sfx.element.volume = this.getActualVolume(this.sfxVolume * sfx.volumeMultiplier);
+      }
     }
 
     // 保存设置
@@ -577,20 +718,46 @@ export class AudioManager {
   }
 
   /**
-   * 设置主音量（同时设置 BGM 和 SFX）
+   * 设置语音音量
+   * @param volume 音量 (0-1)
+   */
+  setVoiceVolume(volume: number): void {
+    this.voiceVolume = Math.max(0, Math.min(1, volume));
+
+    // 更新当前播放的语音音量
+    for (const sfx of this.playingSFX) {
+      if (sfx.type === AudioType.VOICE) {
+        sfx.element.volume = this.getActualVolume(this.voiceVolume * sfx.volumeMultiplier);
+      }
+    }
+
+    // 保存设置
+    this.saveSettings();
+  }
+
+  /**
+   * 获取语音音量
+   */
+  getVoiceVolume(): number {
+    return this.voiceVolume;
+  }
+
+  /**
+   * 设置主音量（同时设置 BGM、SFX 和 Voice）
    * @param volume 音量 (0-1)
    */
   setMasterVolume(volume: number): void {
     const clampedVolume = Math.max(0, Math.min(1, volume));
     this.setBGMVolume(clampedVolume);
     this.setSFXVolume(clampedVolume);
+    this.setVoiceVolume(clampedVolume);
   }
 
   /**
-   * 获取主音量（取 BGM 和 SFX 的平均值）
+   * 获取主音量（取 BGM、SFX 和 Voice 的平均值）
    */
   getMasterVolume(): number {
-    return (this.bgmVolume + this.sfxVolume) / 2;
+    return (this.bgmVolume + this.sfxVolume + this.voiceVolume) / 3;
   }
 
   /**
@@ -608,7 +775,8 @@ export class AudioManager {
     }
 
     for (const sfx of this.playingSFX) {
-      sfx.element.volume = this.getActualVolume(this.sfxVolume);
+      const baseVolume = sfx.type === AudioType.VOICE ? this.voiceVolume : this.sfxVolume;
+      sfx.element.volume = this.getActualVolume(baseVolume * sfx.volumeMultiplier);
     }
 
     // 保存设置
@@ -627,6 +795,17 @@ export class AudioManager {
    */
   isMuted(): boolean {
     return this.muted;
+  }
+
+  /**
+   * 获取当前播放的音效数量
+   * @param type 音效类型（可选）
+   */
+  getPlayingSFXCount(type?: AudioType): number {
+    if (!type) {
+      return this.playingSFX.length;
+    }
+    return this.playingSFX.filter(s => s.type === type).length;
   }
 
   /**
@@ -660,11 +839,27 @@ export class AudioManager {
   }
 
   /**
+   * 预加载语音
+   * @param id 语音 ID
+   */
+  async preloadVoice(id: string): Promise<void> {
+    if (this.voiceCache.has(id)) {
+      return;
+    }
+
+    const audioElement = await this.loadVoice(id);
+    if (audioElement) {
+      this.voiceCache.set(id, audioElement);
+    }
+  }
+
+  /**
    * 预加载多个音频
    * @param bgmList BGM 列表
    * @param sfxList 音效列表
+   * @param voiceList 语音列表
    */
-  async preloadAudio(bgmList: string[], sfxList: string[]): Promise<void> {
+  async preloadAudio(bgmList: string[], sfxList: string[], voiceList: string[] = []): Promise<void> {
     console.log('[AudioManager] Preloading audio...');
 
     const promises: Promise<void>[] = [];
@@ -677,9 +872,13 @@ export class AudioManager {
       promises.push(this.preloadSFX(sfx));
     }
 
+    for (const voice of voiceList) {
+      promises.push(this.preloadVoice(voice));
+    }
+
     await Promise.all(promises);
 
-    console.log(`[AudioManager] Preloaded ${bgmList.length} BGMs and ${sfxList.length} SFXs`);
+    console.log(`[AudioManager] Preloaded ${bgmList.length} BGMs, ${sfxList.length} SFXs and ${voiceList.length} voices`);
   }
 
   /**
@@ -693,6 +892,7 @@ export class AudioManager {
     // 清除缓存
     this.bgmCache.clear();
     this.sfxCache.clear();
+    this.voiceCache.clear();
 
     console.log('[AudioManager] Cache cleared');
   }
@@ -810,6 +1010,20 @@ export class AudioManager {
     const formats = ['.ogg', '.wav', '.mp3'];
     for (const ext of formats) {
       const path = `/assets/tuxemon/sounds/${id}${ext}`;
+      const element = await this.loadAudio(path);
+      if (element) return element;
+    }
+    return undefined;
+  }
+
+  /**
+   * 加载语音
+   */
+  private async loadVoice(id: string): Promise<HTMLAudioElement | undefined> {
+    // 尝试多个格式
+    const formats = ['.ogg', '.wav', '.mp3'];
+    for (const ext of formats) {
+      const path = `/assets/tuxemon/voice/${id}${ext}`;
       const element = await this.loadAudio(path);
       if (element) return element;
     }
