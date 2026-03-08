@@ -241,6 +241,8 @@ export class StatusEffectManager {
       maxDuration: 0, // 永久
       isStackable: false,
       isDispellable: true,
+      icon: '/assets/tuxemon/gfx/status/poison.png',
+      sfx: 'status_poison',
     });
 
     this.statusDataCache.set(StatusEffectId.BAD_POISON, {
@@ -261,6 +263,8 @@ export class StatusEffectManager {
       maxDuration: 0,
       isStackable: false,
       isDispellable: true,
+      icon: '/assets/tuxemon/gfx/status/burn.png',
+      sfx: 'status_burn',
     });
 
     // 控制类状态
@@ -272,6 +276,8 @@ export class StatusEffectManager {
       maxDuration: 0,
       isStackable: false,
       isDispellable: true,
+      icon: '/assets/tuxemon/gfx/status/paralysis.png',
+      sfx: 'status_paralysis',
     });
 
     this.statusDataCache.set(StatusEffectId.FREEZE, {
@@ -282,6 +288,8 @@ export class StatusEffectManager {
       maxDuration: 0,
       isStackable: false,
       isDispellable: true,
+      icon: '/assets/tuxemon/gfx/status/freeze.png',
+      sfx: 'status_freeze',
     });
 
     this.statusDataCache.set(StatusEffectId.SLEEP, {
@@ -292,6 +300,8 @@ export class StatusEffectManager {
       maxDuration: 4,
       isStackable: false,
       isDispellable: true,
+      icon: '/assets/tuxemon/gfx/status/sleep.png',
+      sfx: 'status_sleep',
     });
 
     this.statusDataCache.set(StatusEffectId.CONFUSE, {

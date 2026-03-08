@@ -17,6 +17,10 @@ import {
 } from './BattleState';
 import { TechniqueData } from './TechniqueData';
 import { StatusEffectId } from './StatusEffectManager';
+import {
+  BattleSoundManager,
+  SoundElement,
+} from './BattleSoundManager';
 
 /**
  * 动画类型枚举
@@ -177,6 +181,9 @@ export class BattleAnimationManager {
   /** 单位位置映射 */
   private unitPositions: Map<string, { x: number; y: number }> = new Map();
 
+  /** 音效管理器引用 */
+  private soundManager: BattleSoundManager | null = null;
+
   /**
    * 私有构造函数，确保单例
    */
@@ -208,6 +215,10 @@ export class BattleAnimationManager {
       width: canvas.width,
       height: canvas.height,
     };
+
+    // 获取音效管理器实例
+    this.soundManager = BattleSoundManager.getInstance();
+
     console.log('[BattleAnimationManager] Initialized');
   }
 
@@ -247,30 +258,55 @@ export class BattleAnimationManager {
             event.sourceId !== undefined ? FloatColor.DAMAGE_NORMAL : FloatColor.DAMAGE_SUPER
           );
           this.playMonsterFlash(event.targetId);
+
+          // 播放伤害音效
+          if (this.soundManager) {
+            this.soundManager.playDamageSound(event.value, false);
+          }
         }
         break;
 
       case 'heal':
         if (event.value !== undefined && event.targetId) {
           this.playHealFloat(event.targetId, event.value);
+
+          // 播放治疗音效
+          if (this.soundManager) {
+            this.soundManager.playHealSound(event.value);
+          }
         }
         break;
 
       case 'status_apply':
         if (event.statusId && event.targetId) {
           this.playStatusApply(event.statusId as StatusEffectId, event.targetId);
+
+          // 播放状态音效
+          if (this.soundManager) {
+            this.soundManager.playStatusSound(event.statusId as string);
+          }
         }
         break;
 
       case 'faint':
         if (event.targetId) {
           this.playMonsterDisappear(event.targetId);
+
+          // 播放怪物倒下音效
+          if (this.soundManager) {
+            this.soundManager.playMonsterFaintSound();
+          }
         }
         break;
 
       case 'level_up':
         if (event.targetId) {
           this.playLevelUp(event.targetId);
+
+          // 播放升级音效
+          if (this.soundManager) {
+            this.soundManager.playLevelUpSound();
+          }
         }
         break;
 
@@ -318,6 +354,12 @@ export class BattleAnimationManager {
 
     this.animationQueue.push(instance);
     console.log(`[BattleAnimationManager] Queued technique animation: ${technique.name}`);
+
+    // 播放技能音效
+    if (this.soundManager) {
+      const element = this.mapElementToSoundElement(technique.element);
+      this.soundManager.playTechniqueSound(technique.slug, element, technique.power);
+    }
 
     return animationId;
   }
@@ -889,6 +931,37 @@ export class BattleAnimationManager {
     this.ctx.fill();
 
     this.ctx.restore();
+  }
+
+  /**
+   * 将技能属性映射到音效元素
+   *
+   * @param element 技能属性名称
+   */
+  private mapElementToSoundElement(element?: string): SoundElement | undefined {
+    if (!element) return undefined;
+
+    const elementMap: Record<string, SoundElement> = {
+      fire: SoundElement.FIRE,
+      water: SoundElement.WATER,
+      grass: SoundElement.GRASS,
+      electric: SoundElement.ELECTRIC,
+      ice: SoundElement.ICE,
+      flying: SoundElement.FLYING,
+      fighting: SoundElement.FIGHTING,
+      poison: SoundElement.POISON,
+      ground: SoundElement.GROUND,
+      rock: SoundElement.ROCK,
+      bug: SoundElement.BUG,
+      ghost: SoundElement.GHOST,
+      steel: SoundElement.STEEL,
+      dragon: SoundElement.DRAGON,
+      dark: SoundElement.DARK,
+      fairy: SoundElement.FAIRY,
+      normal: SoundElement.NORMAL,
+    };
+
+    return elementMap[element.toLowerCase()];
   }
 
   /**

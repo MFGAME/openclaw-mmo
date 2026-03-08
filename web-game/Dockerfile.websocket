@@ -1,0 +1,45 @@
+# OpenClaw MMO - WebSocket 服务器 Dockerfile
+# 用于运行游戏 WebSocket 服务器
+
+# 基础镜像
+FROM node:20-alpine
+
+# 设置工作目录
+WORKDIR /app
+
+# 安装必要的依赖
+RUN apk add --no-cache curl git
+
+# 创建非 root 用户
+RUN addgroup -g 1000 -S nodejs && \
+    adduser -S nodejs -u 1000 -G nodejs
+
+# 复制 package 文件
+COPY package*.json ./
+
+# 安装依赖
+RUN npm ci --only=production && \
+    npm cache clean --force
+
+# 复制源代码
+COPY . .
+
+# 构建项目
+RUN npm run build
+
+# 创建日志目录
+RUN mkdir -p /var/log/openclaw && \
+    chown -R nodejs:nodejs /var/log/openclaw
+
+# 切换到非 root 用户
+USER nodejs
+
+# 暴露端口
+EXPOSE 8080
+
+# 健康检查
+HEALTHCHECK --interval=30s --timeout=3s --start-period=10s --retries=3 \
+    CMD curl -f http://localhost:8080/health || exit 1
+
+# 启动 WebSocket 服务器
+CMD ["node", "dist/server/WebSocketServer.js"]
