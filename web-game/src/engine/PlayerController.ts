@@ -405,7 +405,7 @@ export class PlayerController {
     this.jumpStartY = this.position.y;
 
     // 播放跳跃音效（使用 Tuxemon 音效资源）
-    audioManager.playSFX('jump');
+    audioManager.playSFX('player/jump');
 
     // 触发跳跃开始回调
     this.triggerJumpStart({
@@ -535,7 +535,7 @@ export class PlayerController {
 
       // 播放移动音效（跑步时播放脚步声）
       if (this.running) {
-        audioManager.playSFX('footstep');
+        audioManager.playSFX('player/step');
       }
 
       // 触发移动完成回调

@@ -19,6 +19,7 @@ import { itemDataLoader } from './engine/ItemData.js';
 import { titleScreen } from './engine/TitleScreen.js';
 import { bagUI } from './engine/BagUI.js';
 import { io, Socket } from 'socket.io-client';
+import { shopManager } from './engine/ShopManager.js';
 import { battleManager } from './engine/BattleManager.js';
 import { battleUI } from './engine/BattleUI.js';
 import { BattleUnit, BattleResult } from './engine/BattleState.js';
@@ -585,6 +586,11 @@ class OpenClawGame extends Game {
 
         await audioManager.initialize();
         console.log('[Game] Audio manager initialized');
+        // 初始化商店管理器
+        shopManager.initialize();
+        console.log('[Game] Shop manager initialized');
+
+
 
         try {
             // 加载真实 Tuxemon 地图
@@ -705,6 +711,8 @@ class OpenClawGame extends Game {
                 this.gameState = 'playing';
                 titleScreen.hide();
                 console.log('[Game] Game started');
+                audioManager.playBGM('JRPG_town_loop', true, true);
+
             };
             console.log('[Game] Title screen initialized');
 
@@ -836,7 +844,7 @@ class OpenClawGame extends Game {
             followDistance: 3,
             dialogues: villagerDialogues,
             initialDialogueId: 'greeting',
-            customData: {},
+            customData: { shopId: 'village_general_shop' },
             visible: true,
             interactable: true,
             collisionRadius: 8,
@@ -871,7 +879,7 @@ class OpenClawGame extends Game {
             currentPathIndex: 0,
             followDistance: 3,
             dialogues: merchantDialogues,
-            customData: {},
+            customData: { shopId: 'village_general_shop' },
             visible: true,
             interactable: true,
             collisionRadius: 8,

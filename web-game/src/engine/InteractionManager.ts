@@ -317,7 +317,7 @@ export class InteractionManager {
    */
   private handleShop(npc: NPC): InteractionResult {
     // 播放商店音效
-    audioManager.playSFX('shop_open');
+    audioManager.playSFX('interface/confirm');
 
     // 显示欢迎对话（如果有）
     const dialogue = npc.dialogues[0];
