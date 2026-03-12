@@ -25,6 +25,7 @@ import { battleUI } from './engine/BattleUI.js';
 import { BattleUnit, BattleResult } from './engine/BattleState.js';
 import type { MonsterInstance } from './engine/MonsterData.js';
 import { encounterManager, EncounterResult } from './encounter/EncounterManager.js';
+import { performanceMonitor } from './engine/PerformanceMonitor.js';
 
 /**
  * 其他玩家数据接口
@@ -590,6 +591,20 @@ class OpenClawGame extends Game {
         shopManager.initialize();
         console.log('[Game] Shop manager initialized');
 
+        // 初始化性能监控器
+        performanceMonitor.initialize({
+            targetFps: 60,
+            goodFpsThreshold: 55,
+            warningFpsThreshold: 45,
+            criticalFpsThreshold: 30,
+            memoryWarningThreshold: 500,
+            frameTimeWindow: 60,
+            enableMemoryMonitoring: true,
+            enableAutoOptimization: false,
+        });
+        performanceMonitor.showDebugPanel();
+        console.log('[Game] Performance monitor initialized');
+
 
 
         try {
@@ -956,6 +971,10 @@ class OpenClawGame extends Game {
      * 更新游戏状态
      */
     protected onUpdate(deltaTime: number): void {
+        // 更新性能监控
+        performanceMonitor.beginUpdate();
+        performanceMonitor.update();
+
         audioManager.update(deltaTime);
 
         if (this.gameState === 'title') {
@@ -1021,6 +1040,9 @@ class OpenClawGame extends Game {
 
         // 每帧末尾更新输入状态（清空 justPressed 等），必须在所有输入读取之后
         inputManager.update();
+
+        // 结束性能监控
+        performanceMonitor.endUpdate();
     }
 
     /**
@@ -1459,7 +1481,13 @@ class OpenClawGame extends Game {
         const lineHeight = 16;
 
         ctx.fillText('=== Debug Info ===', 20, y); y += lineHeight;
-        ctx.fillText('FPS: ' + this.getTargetFPS(), 20, y); y += lineHeight;
+        const stats = performanceMonitor.getStats();
+        ctx.fillText('FPS: ' + stats.fps.toFixed(1) + ' (目标: ' + this.getTargetFPS() + ')', 20, y); y += lineHeight;
+        ctx.fillText('FPS (平均): ' + stats.avgFps.toFixed(1), 20, y); y += lineHeight;
+        ctx.fillText('帧时间: ' + stats.frameTime.toFixed(2) + 'ms (平均: ' + stats.avgFrameTime.toFixed(2) + 'ms)', 20, y); y += lineHeight;
+        ctx.fillText('更新: ' + stats.updateTime.toFixed(2) + 'ms', 20, y); y += lineHeight;
+        ctx.fillText('渲染: ' + stats.renderTime.toFixed(2) + 'ms', 20, y); y += lineHeight;
+        ctx.fillText('内存: ' + stats.memoryUsage.toFixed(1) + 'MB (峰值: ' + stats.memoryPeak.toFixed(1) + 'MB)', 20, y); y += lineHeight;
         ctx.fillText('Player Tile: (' + playerPos.tileX + ', ' + playerPos.tileY + ')', 20, y); y += lineHeight;
         ctx.fillText('Player Pixel: (' + Math.round(pixelPos.x) + ', ' + Math.round(pixelPos.y) + ')', 20, y); y += lineHeight;
         ctx.fillText('Direction: ' + direction, 20, y); y += lineHeight;

@@ -1,90 +1,117 @@
 # 开发任务
 
-## 任务完成状态
-
-### 任务 1: NPC 商店系统（P0 - 最高优先级）✅ 已完成
-**状态**: 100% 完成
-
-**完成内容**:
-- ✅ ShopManager.ts 已存在且功能完整
-- ✅ ShopUI.ts 已存在且功能完整
-- ✅ 商店数据结构完整（商品列表、价格、库存）
-- ✅ 购买/出售逻辑完整
-- ✅ 货币系统集成（金币系统）
-- ✅ 商店 NPC 已添加到游戏中（merchant1，位置：tileX: 12, tileY: 10）
-- ✅ InteractionManager 支持商店交互
-
-**测试方法**:
-1. 启动游戏（http://localhost:8080）
-2. 找到商人 NPC（在地图坐标 12,10 附近）
-3. 按空格键与商人交互
-4. 使用方向键选择商品，确认购买
+**项目路径**: C:\Users\Administrator\.openclaw\agents\youxiangfa\workspace\openclaw-mmo-server\web-game
 
 ---
 
-### 任务 2: 跑步/跳跃系统（P1）✅ 已完成
-**状态**: 100% 完成
+## 任务列表
 
-**完成内容**:
-- ✅ PlayerController 支持跑步状态（Shift 键）
-- ✅ 跑步时移动速度加倍
-- ✅ 跳跃动画和物理效果（Space 键，抛物线计算）
-- ✅ 跑步音效（player/step.ogg）
-- ✅ 跳跃音效（player/jump.ogg）
-- ✅ 动画系统支持跑步/跳跃状态
+### 任务 1: 完善机器人系统（P0）
 
-**测试方法**:
-1. 按住 Shift + 方向键：跑步（速度加倍）
-2. 按下 Space 键：跳跃
+**目标**: 让机器人完全自主行动
+
+**具体步骤**:
+1. 检查 `src/engine/BotAI.ts` 是否存在，验证功能完整性
+2. 完善 AI 性格逻辑：
+   - 激进型：优先攻击，使用高伤害技能
+   - 辅助型：优先治疗，使用状态技能
+   - 收集型：优先采集，避免战斗
+   - 平衡型：根据情况选择行动
+3. 实现机器人背包管理：
+   - 自动使用恢复道具
+   - 自动使用进化石
+4. 添加机器人升级和进化系统
+5. 测试机器人跟随和自主行为
+
+**验证标准**:
+- 机器人可以自主移动
+- 机器人遇到敌人会战斗
+- 机器人 HP 低时会使用道具
+- 机器人可以升级和进化
 
 ---
 
-### 任务 3: 优化游戏体验（P2）✅ 已完成
-**状态**: 核心功能完成
+### 任务 2: 实现 NPC 商店系统（P1）
 
-**完成内容**:
-- ✅ 场景切换动画（SceneManager.ts 淡入淡出已实现）
-- ✅ BattleUI 战斗界面完整
-- ✅ TutorialSystem 新手引导系统
-- ✅ AudioManager 音频系统完整
-- ✅ BGM 播放（JRPG_town_loop.ogg）
-- ✅ 音效系统（跳跃、脚步、商店打开等）
-- ✅ 交互提示 UI（InteractionManager）
+**目标**: 玩家可以与 NPC 商店交易
 
-**可选优化项目**:
-- ⏳ 战斗动画效果（技能释放动画、伤害数字显示、屏幕震动）- 需要额外开发
-- ⏳ 性能优化（减少 draw call、帧率显示）- 需要额外开发
+**具体步骤**:
+1. 检查 `src/engine/ShopManager.ts` 和 `src/components/ShopUI.ts` 是否存在
+2. 如果不存在，创建以下文件：
+   - `src/engine/ShopManager.ts`（商店逻辑）
+   - `src/components/ShopUI.ts`（商店界面）
+3. 实现商店数据结构：
+   ```typescript
+   interface Shop {
+     id: string;
+     name: string;
+     items: ShopItem[];
+     buyMultiplier: number; // 购买价格倍率
+     sellMultiplier: number; // 出售价格倍率
+   }
+   ```
+4. 实现购买逻辑：
+   - 检查玩家金币是否足够
+   - 扣除金币，添加道具到背包
+5. 实现出售逻辑：
+   - 玩家选择道具
+   - 扣除道具，添加金币
+6. 创建商店 UI：
+   - 显示商品列表
+   - 显示价格
+   - 购买/出售按钮
+7. 在 NPC 配置中添加商店触发器
+
+**验证标准**:
+- 玩家可以打开商店界面
+- 可以购买道具（金币减少，道具增加）
+- 可以出售道具（道具减少，金币增加）
+- UI 显示正确
+
+---
+
+### 任务 3: 优化游戏性能（P2）
+
+**目标**: 游戏稳定运行在 60 FPS
+
+**具体步骤**:
+1. 添加 FPS 计数器：
+   - 在游戏右上角显示当前 FPS
+   - 使用 `requestAnimationFrame` 计算帧率
+2. 分析性能瓶颈：
+   - 检查渲染循环
+   - 检查碰撞检测
+   - 检查事件处理
+3. 实现精灵图预加载：
+   - 启动时预加载所有精灵图
+   - 使用缓存避免重复加载
+4. 优化渲染：
+   - 实现脏矩形检测（只重绘变化区域）
+   - 减少不必要的 `clearRect` 调用
+5. 优化碰撞检测：
+   - 使用空间分区（四叉树）
+   - 减少碰撞检测次数
+
+**验证标准**:
+- 游戏稳定运行在 60 FPS
+- FPS 显示在右上角
+- 没有明显卡顿
 
 ---
 
 ## 要求
 
-- ✅ 执行任务前已阅读 TUXEMON_RESOURCES.md
-- ✅ 所有资源使用 Tuxemon 原版资源
-- ✅ 未使用占位符、未自制素材
-- ✅ 代码有详细的中文注释
-- ✅ 确保 npm run build 编译通过
+1. **必须阅读 TUXEMON_RESOURCES.md**，确保使用 Tuxemon 原版资源
+2. **禁止使用占位符素材**
+3. **禁止自制素材**
+4. **代码必须有详细中文注释**
+5. **每完成一个任务，更新 todolist.md**
 
 ---
 
 ## 完成通知
 
-✅ **任务已完成！**
-
-执行以下命令通知完成：
+完成后运行：
+```bash
+C:\Users\Administrator\AppData\Roaming\npm\openclaw.cmd system event --text "Done: 机器人 + 商店 + 性能优化完成" --mode now
 ```
-C:\Users\Administrator\AppData\Roaming\npm\openclaw.cmd system event --text "Done: NPC 商店 + 跑步跳跃 + 游戏优化" --mode now
-```
-
----
-
-## 修改记录
-
-### 2026-03-12 修改
-1. main.ts - 添加 ShopManager 导入和初始化
-2. main.ts - 商店 NPC customData 添加 shopId
-3. main.ts - 游戏开始时播放 BGM (JRPG_town_loop.ogg)
-4. PlayerController.ts - 修正音效路径（player/step, player/jump）
-5. InteractionManager.ts - 商店音效使用 interface/confirm
-6. todolist.md - 更新任务完成状态
-7. 所有修改已通过编译验证
