@@ -8,9 +8,9 @@
  * - 支持室内外场景切换
  */
 
-import { TMXMapData } from './MapParser';
-import { playerController } from './PlayerController';
-import { collisionManager } from './CollisionManager';
+import { TMXMapData } from './MapParser.js';
+import { playerController } from './PlayerController.js';
+import { collisionManager } from './CollisionManager.js';
 
 /**
  * 传送门数据接口

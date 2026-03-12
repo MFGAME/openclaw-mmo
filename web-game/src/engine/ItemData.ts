@@ -136,8 +136,16 @@ export class ItemDataLoader {
    * 加载 Tuxemon 道具数据
    */
   private async loadTuxemonItems(): Promise<void> {
-    // 获取道具文件列表
-    let itemFiles: string[] = await this.getItemFileList();
+    // 从 items_list.json 获取实际存在的道具列表，避免请求不存在的文件产生 404
+    let itemFiles: string[] = [];
+    try {
+      const listRes = await fetch('/assets/tuxemon/items/items_list.json');
+      if (listRes.ok) {
+        itemFiles = await listRes.json();
+      }
+    } catch (_e) {
+      itemFiles = ['potion', 'revive', 'super_potion', 'tuxeball', 'tea'];
+    }
 
     // 加载每个道具的数据
     for (const slug of itemFiles) {
@@ -147,8 +155,8 @@ export class ItemDataLoader {
           const data = await response.json();
           this.itemCache.set(slug, this.createItemDataFromRaw(slug, data));
         }
-      } catch (e) {
-        console.warn(`[ItemDataLoader] Failed to load ${slug}:`, e);
+      } catch (_e) {
+        // 文件不存在或解析失败时静默跳过
       }
     }
 
@@ -266,49 +274,6 @@ export class ItemDataLoader {
       .split('_')
       .map(word => word.charAt(0).toUpperCase() + word.slice(1))
       .join(' ');
-  }
-
-  /**
-   * 获取道具文件列表
-   */
-  private async getItemFileList(): Promise<string[]> {
-    // 从实际的道具文件中获取列表
-    const itemList = [
-      'aardant', 'allies_address', 'alpha_seep', 'ancient_egg', 'ancient_tea',
-      'antidote_grapes', 'app_banking', 'app_contacts', 'app_map', 'app_radio',
-      'app_renaming', 'app_tuxepedia', 'bite_of_despair', 'bivouac', 'book_wishes',
-      'boost_armour', 'boost_dodge', 'boost_melee', 'boost_ranged', 'booster_tech',
-      'boost_speed', 'cosmic_berry', 'cure_festering', 'cureall', 'die',
-      'dojo_pass', 'dread_omelette', 'drone', 'earth_berry', 'earth_booster',
-      'earthmover_key', 'escape_key', 'feather', 'fire_berry', 'fire_booster',
-      'fishing_rod', 'flintstone', 'flute', 'food_beastmoss', 'food_cheesecake',
-      'food_crackle_salt', 'food_cream_puffs', 'food_crepes', 'food_croissants',
-      'food_field_greens', 'food_flamehorn_shank', 'food_glowfat', 'food_hash',
-      'food_honey_cake', 'food_mashed_potatoes', 'food_meal_dust', 'food_meatballs',
-      'food_mille_feuille', 'food_mistflour_eggs', 'food_moo_bloom', 'food_pancakes',
-      'food_pastry', 'food_phyllo', 'food_pie', 'food_pita', 'food_potato_casserole',
-      'food_potato_fries', 'food_pretzels', 'food_pudding', 'food_root_beast_bark',
-      'food_rub_chicken', 'food_rub_pork_chops', 'food_rub_ribs', 'food_rub_steak',
-      'food_shell_tacos', 'food_sky_feather', 'food_souffle', 'food_spice_dust',
-      'food_starpapper', 'food_stonefruit_bulbs', 'food_suncrust_butter', 'food_sweetroot',
-      'food_wings', 'food_zestroot_wraps', 'food_zestsap', 'friendship_scroll',
-      'frost_berry', 'gold_pass', 'greenwash_badge', 'hatchet', 'heroic_berry',
-      'horseshoe', 'imperial_potion', 'imperial_tea', 'inferno_custard', 'lightning_berry',
-      'lima_pie', 'lucky_bamboo', 'marble', 'mega_potion', 'metal_berry',
-      'metal_booster', 'miaow_milk', 'mm_earth', 'mm_fire', 'mm_fire_mega',
-      'mm_fire_ultra', 'mm_grass', 'mm_grass_mega', 'mm_grass_ultra', 'mm_water',
-      'mm_water_mega', 'mm_water_ultra', 'monster_burger', 'nap_cap', 'nu_tech',
-      'old_key', 'pep_pill', 'pepper', 'performance_tea', 'pill', 'potion',
-      'revive', 'revive_tech', 'sapphire_berry', 'scroll_fire', 'scroll_water',
-      'sky_booster', 'smoke_bomb', 'soda', 'soft_drink', 'soda_bubble',
-      'soda_fruit', 'soda_ginger', 'soda_ice', 'spark_berry', 'spear_key',
-      'stardust', 'stone_berry', 'strawberry', 'sugar', 'super_potion',
-      'sweet_berry', 'tangerine', 'tea', 'tea_bag', 'ticket', 'tinned_sardines',
-      'tuxeball', 'ultimate_berry', 'ultra_potion', 'video_game', 'vial',
-      'water_berry', 'water_booster', 'weapon', 'whetstone', 'x_potion',
-      'yellow_berry',
-    ];
-    return itemList;
   }
 
   /**

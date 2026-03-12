@@ -1,7 +1,7 @@
-import { collisionManager } from './CollisionManager';
-import { Direction, PlayerController } from './PlayerController';
-import { pathfinder } from './Pathfinder';
-import { PathQueue, PathQueueState } from './PathQueue';
+import { collisionManager } from './CollisionManager.js';
+import { Direction, PlayerController } from './PlayerController.js';
+import { pathfinder } from './Pathfinder.js';
+import { PathQueue, PathQueueState } from './PathQueue.js';
 
 /**
  * NPC 行为类型枚举

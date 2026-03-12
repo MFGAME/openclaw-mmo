@@ -1,4 +1,4 @@
-import { TMXMapData } from './MapParser';
+import { TMXMapData } from './MapParser.js';
 
 /**
  * 碰撞层配置接口

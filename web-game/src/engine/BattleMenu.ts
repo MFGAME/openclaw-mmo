@@ -8,8 +8,8 @@
  * - 处理用户输入
  */
 
-import { inputManager, KeyCode } from './InputManager';
-import { techniqueDataLoader, TechniqueData } from './TechniqueData';
+import { inputManager, KeyCode } from './InputManager.js';
+import { techniqueDataLoader, TechniqueData } from './TechniqueData.js';
 
 /**
  * 菜单动作类型

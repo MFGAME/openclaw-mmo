@@ -1,11 +1,11 @@
-import { inputManager, KeyCode } from './InputManager';
-import { playerController, PlayerState } from './PlayerController';
-import { npcManager, NPC } from './NPCManager';
-import { dialogManager } from './DialogManager';
-import { sceneManager } from './SceneManager';
-import { TMXObject } from './MapParser';
-import { shopUI } from '../components/ShopUI';
-import { audioManager } from './AudioManager';
+import { inputManager, KeyCode } from './InputManager.js';
+import { playerController, PlayerState } from './PlayerController.js';
+import { npcManager, NPC } from './NPCManager.js';
+import { dialogManager } from './DialogManager.js';
+import { sceneManager } from './SceneManager.js';
+import { TMXObject } from './MapParser.js';
+import { shopUI } from '../components/ShopUI.js';
+import { audioManager } from './AudioManager.js';
 
 /**
  * 交互类型枚举
@@ -620,6 +620,7 @@ export class InteractionManager {
       'ArrowDown': '↓',
       'ArrowLeft': '←',
       'ArrowRight': '→',
+      ' ': 'Space',
       'Space': 'Space',
       'Enter': 'Enter',
       'Escape': 'Esc',

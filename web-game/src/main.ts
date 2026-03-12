@@ -19,6 +19,11 @@ import { itemDataLoader } from './engine/ItemData.js';
 import { titleScreen } from './engine/TitleScreen.js';
 import { bagUI } from './engine/BagUI.js';
 import { io, Socket } from 'socket.io-client';
+import { battleManager } from './engine/BattleManager.js';
+import { battleUI } from './engine/BattleUI.js';
+import { BattleUnit, BattleResult } from './engine/BattleState.js';
+import type { MonsterInstance } from './engine/MonsterData.js';
+import { encounterManager, EncounterResult } from './encounter/EncounterManager.js';
 
 /**
  * 其他玩家数据接口
@@ -31,6 +36,30 @@ interface OtherPlayer {
     direction: Direction;
     level: number;
     isBot: boolean;
+}
+/**
+ * 从怪物实例创建战斗单位
+ */
+function createBattleUnitFromInstance(m: MonsterInstance, isPlayer: boolean): BattleUnit {
+  return {
+    id: m.instanceId,
+    monsterId: m.monsterId,
+    name: m.nickname || m.monsterId,
+    currentHp: m.currentHp,
+    maxHp: m.maxHp,
+    level: m.level,
+    exp: m.exp,
+    elements: m.types,
+    status: m.status,
+    techniques: m.techniques,
+    attack: m.attack,
+    defense: m.defense,
+    speed: m.speed,
+    specialAttack: m.specialAttack,
+    specialDefense: m.specialDefense,
+    isPlayer,
+    isFainted: m.currentHp <= 0,
+  };
 }
 interface BattleData {
     battleId: string;
@@ -178,27 +207,24 @@ class OpenClawGame extends Game {
             }
         });
 
-        // 接收挑战请求
-        this.socket.on('challenge_received', (data: { challengerId: string; challengerName: string }) => {
-            console.log('[MMO] 收到挑战请求:', data.challengerName);
-            this.showChallengeDialog(data.challengerId, data.challengerName);
+        // 接收挑战请求（服务器发送 fromId, fromName, battleId）
+        this.socket.on('challenge_received', (data: { fromId: string; fromName: string; battleId: string }) => {
+            console.log('[MMO] 收到挑战请求:', data.fromName);
+            this.showChallengeDialog(data.fromId, data.fromName, data.battleId);
         });
 
-        // 接收挑战响应
-        this.socket.on('challenge_response', (data: { accepted: boolean; playerId: string; playerName: string }) => {
-            if (data.accepted) {
-                console.log('[MMO] 挑战被接受:', data.playerName);
-                this.startBattle({ battleId: Date.now().toString(), opponent: this.otherPlayers.get(data.playerId)! });
-            } else {
-                console.log('[MMO] 挑战被拒绝:', data.playerName);
-                this.showToast(`${data.playerName} 拒绝了你的挑战`);
+        // 接收挑战响应（仅在被拒绝时由服务器转发，接受时服务器直接发 battle_start）
+        this.socket.on('challenge_response', (data: { accepted: boolean }) => {
+            if (!data.accepted) {
+                console.log('[MMO] 挑战被拒绝');
+                this.showToast('对方拒绝了你的挑战');
             }
         });
 
-        // 开始战斗
-        this.socket.on('battle_start', (battleData: BattleData) => {
-            console.log('[MMO] 开始战斗:', battleData);
-            this.startBattle(battleData);
+        // 开始战斗（服务器发送 battleId, player1, player2）
+        this.socket.on('battle_start', (data: { battleId: string; player1: OtherPlayer; player2: OtherPlayer }) => {
+            const opponent = data.player1.id === this.playerId ? data.player2 : data.player1;
+            this.startBattle({ battleId: data.battleId, opponent });
         });
 
         // 战斗结束
@@ -309,16 +335,14 @@ class OpenClawGame extends Game {
     }
 
     /**
-     * 响应挑战
+     * 响应挑战（服务器需要 battleId 才能匹配挑战）
      */
-    private respondToChallenge(challengerId: string, accepted: boolean): void {
+    private respondToChallenge(battleId: string, accepted: boolean): void {
         if (!this.socket || !this.connectedToMMO) return;
 
-        console.log('[MMO] 响应挑战:', challengerId, accepted);
+        console.log('[MMO] 响应挑战:', battleId, accepted);
         this.socket.emit('challenge_response', {
-            challengerId,
-            responderId: this.playerId,
-            responderName: this.playerName,
+            battleId,
             accepted,
         });
 
@@ -331,7 +355,7 @@ class OpenClawGame extends Game {
     /**
      * 显示挑战对话框
      */
-    private showChallengeDialog(challengerId: string, challengerName: string): void {
+    private showChallengeDialog(_challengerId: string, challengerName: string, battleId: string): void {
         const overlay = document.createElement('div');
         overlay.style.cssText = `
             position: fixed;
@@ -390,23 +414,130 @@ class OpenClawGame extends Game {
         document.body.appendChild(overlay);
 
         document.getElementById('accept-challenge')?.addEventListener('click', () => {
-            this.respondToChallenge(challengerId, true);
+            this.respondToChallenge(battleId, true);
             document.body.removeChild(overlay);
         });
 
         document.getElementById('reject-challenge')?.addEventListener('click', () => {
-            this.respondToChallenge(challengerId, false);
+            this.respondToChallenge(battleId, false);
             document.body.removeChild(overlay);
         });
     }
 
     /**
-     * 开始战斗
+     * 检查怪物遭遇
+     * @param tileX 玩家当前瓦片 X 坐标
+     * @param tileY 玩家当前瓦片 Y 坐标
+     */
+    private checkEncounter(tileX: number, tileY: number): void {
+        if (!this.mapData) return;
+
+        // 获取当前瓦片 GID（从第一个非空瓦片层获取）
+        let tileGid = 0;
+        for (const layer of this.mapData.tileLayers) {
+            if (!layer.visible || layer.data.length === 0) continue;
+            const index = tileY * layer.width + tileX;
+            if (index >= 0 && index < layer.data.length) {
+                tileGid = layer.data[index];
+                if (tileGid > 0) break;
+            }
+        }
+
+        // 检查是否为草丛瓦片（GID 1-4 为草丛）
+        const grassGids = [1, 2, 3, 4];
+        if (!grassGids.includes(tileGid)) return;
+
+        // 使用 EncounterManager 检查遭遇
+        const mapName = (this.mapData.properties.name as string) || 'default';
+        const result = encounterManager.checkEncounter(
+            tileX,
+            tileY,
+            tileGid,
+            mapName
+        );
+
+        if (result.triggered && result.monster) {
+            this.startEncounterBattle(result);
+        }
+    }
+
+    /**
+     * 开始遭遇战斗
+     * @param result 遭遇结果
+     */
+    private startEncounterBattle(result: EncounterResult): void {
+        if (!result.monster) return;
+
+        this.inBattle = true;
+        this.showToast(`遭遇了 ${result.monster.monsterId}！`);
+
+        console.log('[Encounter] 遭遇战斗开始:', result.monster.monsterId);
+
+        // 创建玩家队伍
+        const playerParty = this.createDefaultPlayerParty();
+        if (playerParty.length === 0) {
+            this.showToast('战斗数据加载失败');
+            this.inBattle = false;
+            return;
+        }
+
+        // 创建敌方队伍（遭遇的怪物）
+        const enemyUnit: BattleUnit = createBattleUnitFromInstance(result.monster, false);
+        const enemyParty = [enemyUnit];
+
+        // 开始战斗
+        battleManager.startBattle(playerParty, enemyParty, {
+            canEscape: true,
+            background: result.zoneType === 'grass' ? 'grassland' : 'grassland',
+        });
+    }
+
+    /**
+     * 开始战斗（启动真实战斗逻辑与 UI）
      */
     private startBattle(battleData: BattleData): void {
         this.inBattle = true;
         this.showToast(`与 ${battleData.opponent.name} 的战斗开始！`);
         console.log('[MMO] 进入战斗:', battleData);
+
+        const playerParty = this.createDefaultPlayerParty();
+        const enemyParty = this.createDefaultEnemyParty(battleData.opponent.name);
+        if (playerParty.length === 0 || enemyParty.length === 0) {
+            this.showToast('战斗数据加载失败');
+            this.inBattle = false;
+            return;
+        }
+        battleManager.startBattle(playerParty, enemyParty, { canEscape: true });
+    }
+
+    /** 创建默认玩家队伍（1 只怪物） */
+    private createDefaultPlayerParty(): BattleUnit[] {
+        const slugs = ['cardiling', 'rockitten', 'leafygator'];
+        for (const slug of slugs) {
+            const instance = monsterDataLoader.createMonsterInstance(slug, 5);
+            if (instance) return [createBattleUnitFromInstance(instance, true)];
+        }
+        const all = monsterDataLoader.getAllMonsters();
+        if (all.length > 0) {
+            const instance = monsterDataLoader.createMonsterInstance(all[0].slug, 5);
+            if (instance) return [createBattleUnitFromInstance(instance, true)];
+        }
+        return [];
+    }
+
+    /** 创建默认敌方队伍（1 只怪物） */
+    private createDefaultEnemyParty(_opponentName: string): BattleUnit[] {
+        const slugs = ['rockitten', 'cardiling', 'leafygator'];
+        for (const slug of slugs) {
+            const instance = monsterDataLoader.createMonsterInstance(slug, 5);
+            if (instance) return [createBattleUnitFromInstance(instance, false)];
+        }
+        const all = monsterDataLoader.getAllMonsters();
+        if (all.length > 0) {
+            const instance = monsterDataLoader.createMonsterInstance(all[0].slug, 5);
+            if (instance) return [createBattleUnitFromInstance(instance, false)];
+        }
+        return [];
     }
 
     /**
@@ -444,7 +575,8 @@ class OpenClawGame extends Game {
         console.log('Initializing OpenClaw MMO...');
 
         // 获取加载屏幕元素
-        this.loadingScreen = document.getElementById('loading-screen');
+        // index.html 中加载容器 id 为 "loading"
+        this.loadingScreen = document.getElementById('loading');
         this.loadingText = document.getElementById('loading-text');
 
         // 初始化输入系统
@@ -491,6 +623,11 @@ class OpenClawGame extends Game {
                 keyRepeatInterval: 100,
                 jumpHeight: 16,
                 jumpDuration: 300,
+                // 面前有可交互 NPC 时 Space 优先触发对话而非跳跃
+                shouldSkipJump: () => {
+                    const npc = npcManager.getNPCInFrontOfPlayer();
+                    return !!(npc && npc.interactable);
+                },
             });
 
             // 设置玩家起始位置（在地图中心附近）
@@ -499,6 +636,11 @@ class OpenClawGame extends Game {
             // 注册移动事件回调
             playerController.onMoveComplete((event) => {
                 console.log(`[Player] Moved from (${event.fromX}, ${event.fromY}) to (${event.toX}, ${event.toY})`);
+
+                // 检查怪物遭遇（仅在游戏中且不在战斗时）
+                if (this.gameState === 'playing' && !this.inBattle && this.mapData) {
+                    this.checkEncounter(event.toX, event.toY);
+                }
             });
 
             playerController.onMoveBlocked((event) => {
@@ -520,6 +662,9 @@ class OpenClawGame extends Game {
             // 初始化交互管理器
             interactionManager.initialize();
             console.log('[Game] Interaction manager initialized');
+
+            battleUI.initialize();
+            console.log('[Game] Battle UI initialized');
 
             // 初始化场景管理器
             sceneManager.initialize(this.tileWidth, this.tileHeight);
@@ -556,6 +701,11 @@ class OpenClawGame extends Game {
 
             await titleScreen.initialize();
             this.gameState = 'title';
+            titleScreen.onGameStart = () => {
+                this.gameState = 'playing';
+                titleScreen.hide();
+                console.log('[Game] Game started');
+            };
             console.log('[Game] Title screen initialized');
 
             console.log('Game initialized successfully');
@@ -801,7 +951,22 @@ class OpenClawGame extends Game {
         audioManager.update(deltaTime);
 
         if (this.gameState === 'title') {
+            // 将键盘输入传递给标题界面（按任意键、主菜单导航）
+            const pressed = (k: KeyCode | string) => inputManager.isPressed(k);
+            const held = (k: KeyCode | string) => inputManager.isHeld(k);
+            const anyKey = () => inputManager.anyKeyPressed(
+                KeyCode.ENTER, KeyCode.SPACE, KeyCode.KEY_Z, KeyCode.KEY_X, KeyCode.ESCAPE,
+                KeyCode.UP, KeyCode.DOWN, KeyCode.LEFT, KeyCode.RIGHT
+            );
+            let action: 'up' | 'down' | 'left' | 'right' | 'confirm' | 'cancel' | 'any' | null = null;
+            if (pressed(KeyCode.UP) || held(KeyCode.UP)) action = 'up';
+            else if (pressed(KeyCode.DOWN) || held(KeyCode.DOWN)) action = 'down';
+            else if (pressed(KeyCode.KEY_Z) || pressed(KeyCode.ENTER) || pressed(KeyCode.SPACE)) action = 'confirm';
+            else if (pressed(KeyCode.KEY_X) || pressed(KeyCode.ESCAPE)) action = 'cancel';
+            else if (anyKey()) action = 'any';
+            if (action) titleScreen.handleInput(action);
             titleScreen.update(deltaTime);
+            inputManager.update();
             return;
         }
 
@@ -830,18 +995,39 @@ class OpenClawGame extends Game {
         // 更新摄像机位置（跟随玩家）
         this.updateCamera();
 
+        // 战斗中：更新战斗 UI，并检测战斗结束
+        if (this.inBattle) {
+            battleUI.update(deltaTime);
+            const state = battleManager.getBattleState();
+            if (state && state.result !== BattleResult.ONGOING) {
+                this.inBattle = false;
+                battleManager.clearBattle();
+                battleUI.clear();
+                const msg = state.result === BattleResult.WIN ? '胜利！' : state.result === BattleResult.LOSE ? '失败...' : '已逃跑';
+                this.showToast(`战斗结束: ${msg}`);
+            }
+        }
+
         // 检查挑战输入（Z 键）
         this.checkChallengeInput();
+
+        // 每帧末尾更新输入状态（清空 justPressed 等），必须在所有输入读取之后
+        inputManager.update();
     }
 
     /**
      * 检查挑战输入
      */
     private checkChallengeInput(): void {
-        if (!this.connectedToMMO || this.inBattle) return;
+        if (this.inBattle) return;
 
         // 检查 Z 键按下
-        if (inputManager.isPressed("z")) {
+        if (inputManager.isPressed('z')) {
+            if (!this.connectedToMMO) {
+                this.showToast('请先连接 MMO 服务器才能挑战其他玩家');
+                return;
+            }
+
             const playerPos = playerController.getTilePosition();
 
             // 找到最近的玩家
@@ -1225,30 +1411,22 @@ class OpenClawGame extends Game {
     }
 
     /**
-     * 渲染战斗 UI
+     * 渲染战斗 UI（有战斗状态时用 BattleUI，否则占位）
      */
     private renderBattleUI(ctx: CanvasRenderingContext2D): void {
         const width = this.getWidth();
         const height = this.getHeight();
-
-        // 半透明遮罩
+        const state = battleManager.getBattleState();
+        if (state) {
+            battleUI.render(ctx, width, height);
+            return;
+        }
+        // 占位
         ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
         ctx.fillRect(0, 0, width, height);
-
-        // 战斗界面边框
-        ctx.strokeStyle = '#ef4444';
-        ctx.lineWidth = 3;
-        ctx.strokeRect(50, 50, width - 100, height - 100);
-
-        // 战斗标题
-        ctx.fillStyle = '#ef4444';
-        ctx.font = 'bold 24px Arial';
-        ctx.textAlign = 'center';
-        ctx.fillText('⚔️ PvP 战斗 ⚔️', width / 2, 100);
-
-        // 占位战斗内容
         ctx.fillStyle = '#ffffff';
         ctx.font = '16px Arial';
+        ctx.textAlign = 'center';
         ctx.fillText('战斗进行中...', width / 2, height / 2);
     }
 

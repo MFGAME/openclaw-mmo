@@ -1,7 +1,7 @@
-import { inputManager, KeyCode, SwipeDirection } from './InputManager';
-import { collisionManager } from './CollisionManager';
-import { pathfinder, PathPoint } from './Pathfinder';
-import { audioManager } from './AudioManager';
+import { inputManager, KeyCode, SwipeDirection } from './InputManager.js';
+import { collisionManager } from './CollisionManager.js';
+import { pathfinder, PathPoint } from './Pathfinder.js';
+import { audioManager } from './AudioManager.js';
 
 /**
  * 方向枚举
@@ -79,6 +79,8 @@ export interface PlayerConfig {
   jumpHeight: number;
   /** 跳跃持续时间（毫秒） */
   jumpDuration: number;
+  /** 按下 Space 时是否应跳过跳跃（如：面前有可交互 NPC 时优先对话） */
+  shouldSkipJump?: () => boolean;
 }
 
 /**
@@ -286,8 +288,8 @@ export class PlayerController {
   update(deltaTime: number): void {
     if (!this.initialized) return;
 
-    // 更新输入管理器
-    inputManager.update();
+    // 注意：inputManager.update() 应在每帧末尾调用（由 main 主循环负责），
+    // 否则 handleInput 中的 isPressed/isHeld 会因 justPressed 被提前清空而失效
 
     // 如果在对话或交互中，不处理移动
     if (this.state === PlayerState.DIALOGUE || this.state === PlayerState.INTERACTING) {
@@ -298,11 +300,12 @@ export class PlayerController {
     if (this.state === PlayerState.JUMPING) {
       this.updateJumpAnimation(deltaTime);
     } else {
-      // 检测 Space 键（跳跃）
-      if (inputManager.isPressed(KeyCode.SPACE)) {
+      // 检测 Space 键（跳跃），但若面前有可交互对象则优先交给交互系统处理
+      const skipJump = this.config.shouldSkipJump?.();
+      if (inputManager.isPressed(KeyCode.SPACE) && !skipJump) {
         this.startJump();
       } else {
-        // 处理移动动画
+        // 处理移动动画（Space+skipJump 时由 InteractionManager 处理交互）
         if (this.state === PlayerState.MOVING) {
           this.updateMoveAnimation(deltaTime);
         } else {

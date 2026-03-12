@@ -16,11 +16,11 @@ import {
   BattleAction,
   BattleEvent,
   BattleState,
-} from './BattleState';
-import { monsterDataLoader as _monsterDataLoader } from './MonsterData';
-import { techniqueDataLoader as _techniqueDataLoader } from './TechniqueData';
-import { experienceSystem } from './ExperienceSystem';
-import { itemDataLoader } from './ItemData';
+} from './BattleState.js';
+import { monsterDataLoader as _monsterDataLoader } from './MonsterData.js';
+import { techniqueDataLoader as _techniqueDataLoader } from './TechniqueData.js';
+import { experienceSystem } from './ExperienceSystem.js';
+import { itemDataLoader } from './ItemData.js';
 
 /**
  * 战斗配置接口

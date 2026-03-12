@@ -4,7 +4,7 @@
  * 用于在网格地图中查找最短路径
  */
 
-import { collisionManager } from './CollisionManager';
+import { collisionManager } from './CollisionManager.js';
 
 /**
  * 节点接口

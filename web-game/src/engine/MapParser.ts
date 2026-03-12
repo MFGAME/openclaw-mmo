@@ -257,6 +257,10 @@ export class MapParser {
         tsxPath = baseUrl + source.substring(1);
       }
 
+      // 修正 TSX 路径：将 gfx/tilesets/ 替换为 tilesets/
+      // 地图使用 ../gfx/tilesets/xxx.tsx，但实际文件在 ../tilesets/xxx.tsx
+      tsxPath = tsxPath.replace('/gfx/tilesets/', '/tilesets/');
+
       console.log(`[MapParser] 加载外部 tileset: ${tsxPath}`);
 
       try {
@@ -274,13 +278,15 @@ export class MapParser {
           throw new Error('[MapParser] TSX 文件未找到 tileset 元素');
         }
 
-        // 修正图片路径：从 gfx/tilesets/xxx.png 改为 tilesets/xxx.png
+        // TSX 中的图片路径是相对路径，在 main.ts 中加载时会加上 assets/tuxemon/ 前缀
         const imageEl = tsxElement.querySelector('image');
         let imagePath = imageEl?.getAttribute('source') || '';
 
-        // 修正路径：将 ../gfx/tilesets/ 替换为 tilesets/
-        imagePath = imagePath.replace('../gfx/tilesets/', 'tilesets/');
-        imagePath = imagePath.replace('../tilesets/', 'tilesets/');
+        // TSX 文件在 tilesets/ 目录中，图片也在同一目录
+        // 修正路径以匹配 main.ts 中的 assets/tuxemon/ 前缀
+        if (!imagePath.startsWith('../') && !imagePath.startsWith('./') && !imagePath.startsWith('/')) {
+          imagePath = `tilesets/${imagePath}`;
+        }
 
         const firstGid = parseInt(element.getAttribute('firstgid') || '1', 10);
 

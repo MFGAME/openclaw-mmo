@@ -12,9 +12,9 @@
  * - 支持不同类型的商店（道具店、精灵球店、药水店等）
  */
 
-import { ItemData, ItemCategory } from './ItemData';
-import { currencySystem, CurrencyType, CurrencyChangeType } from './CurrencySystem';
-import { itemDataLoader } from './ItemData';
+import { ItemData, ItemCategory } from './ItemData.js';
+import { currencySystem, CurrencyType, CurrencyChangeType } from './CurrencySystem.js';
+import { itemDataLoader } from './ItemData.js';
 
 /**
  * 商店类型枚举

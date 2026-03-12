@@ -2,6 +2,13 @@
  * 主菜单组件
  *
  * 负责显示和处理主菜单，包括：
+ */
+
+import { saveManager } from './SaveManager.js';
+import { audioManager } from './AudioManager.js';
+import { confirmDialog, ConfirmAction } from './ConfirmDialog.js';
+
+/**
  * - 菜单选项（开始游戏、继续游戏、设置、退出）
  * - 菜单导航
  * - 菜单动画效果
@@ -134,7 +141,6 @@ export class MainMenu {
    */
   private checkSaveFile(): void {
     try {
-      const { saveManager } = require('./SaveManager');
       const slotInfo = saveManager.getSlotInfo();
 
       // 查找最新的存档
@@ -278,7 +284,6 @@ export class MainMenu {
 
     if (selectedOption.enabled) {
       // 检查是否需要确认
-      const { confirmDialog, ConfirmAction } = require('./ConfirmDialog');
 
       if (selectedOption.id === MainMenuAction.NEW_GAME && this.hasSaveFile) {
         // 有存档时，开始新游戏需要确认
@@ -518,7 +523,6 @@ export class MainMenu {
    * 播放选择音效
    */
   private playSelectSound(): void {
-    const { audioManager } = require('./AudioManager');
     audioManager.playSFXLegacy('menu_select');
   }
 
@@ -526,7 +530,6 @@ export class MainMenu {
    * 播放确认音效
    */
   private playConfirmSound(): void {
-    const { audioManager } = require('./AudioManager');
     audioManager.playSFXLegacy('menu_confirm');
   }
 
@@ -534,7 +537,6 @@ export class MainMenu {
    * 播放错误音效
    */
   private playErrorSound(): void {
-    const { audioManager } = require('./AudioManager');
     audioManager.playSFXLegacy('menu_error');
   }
 

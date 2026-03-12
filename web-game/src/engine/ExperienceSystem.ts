@@ -11,8 +11,8 @@
  * - 技能学习逻辑（升级时检查是否解锁新技能）
  */
 
-import { BattleUnit, BattleEvent } from './BattleState';
-import { MonsterData } from './MonsterData';
+import { BattleUnit, BattleEvent } from './BattleState.js';
+import { MonsterData } from './MonsterData.js';
 
 /**
  * 经验曲线类型

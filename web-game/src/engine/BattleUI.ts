@@ -14,9 +14,9 @@ import {
   BattleUnit,
   BattleEvent,
   BattleState,
-} from './BattleState';
-import { battleManager, BattleCallback } from './BattleManager';
-import { BattleMenu, MenuAction } from './BattleMenu';
+} from './BattleState.js';
+import { battleManager, BattleCallback } from './BattleManager.js';
+import { BattleMenu, MenuAction } from './BattleMenu.js';
 
 /**
  * UI 配置

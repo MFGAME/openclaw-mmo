@@ -7,6 +7,8 @@
     "build": "tsc",
     "dev": "tsc --watch",
     "serve": "npx serve . -p 8080",
+    "server": "node server/index.js",
+    "server:dev": "tsc --watch && node server/index.js",
     "clean": "rm -rf dist"
   },
   "keywords": [
@@ -23,6 +25,7 @@
   "type": "module",
   "dependencies": {
     "@types/ws": "^8.18.1",
+    "socket.io": "^4.8.3",
     "socket.io-client": "^4.8.3",
     "ws": "^8.19.0"
   }

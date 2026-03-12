@@ -117,6 +117,14 @@
     <p><span class="key">Space</span> 跳跃</p>
   </div>
 
+  <!-- Import Map：让浏览器能解析 socket.io-client 等 npm 包 -->
+  <script type="importmap">
+  {
+    "imports": {
+      "socket.io-client": "https://esm.sh/socket.io-client@4.8.3"
+    }
+  }
+  </script>
   <script type="module" src="./dist/main.js"></script>
 </body>
 </html>

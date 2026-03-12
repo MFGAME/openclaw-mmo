@@ -3,11 +3,11 @@
  *
  * 负责显示游戏标题画面和主菜单
  */
-import { MainMenu, MainMenuAction } from './MainMenu';
-import { SaveSelectUI, SaveSelectAction } from './SaveSelectUI';
-import { SettingsUI, SettingsAction } from './SettingsUI';
-import { confirmDialog } from './ConfirmDialog';
-import { audioManager } from './AudioManager';
+import { MainMenu, MainMenuAction } from './MainMenu.js';
+import { SaveSelectUI, SaveSelectAction } from './SaveSelectUI.js';
+import { SettingsUI, SettingsAction } from './SettingsUI.js';
+import { confirmDialog } from './ConfirmDialog.js';
+import { audioManager } from './AudioManager.js';
 
 /**
  * 标题画面状态

@@ -1,5 +1,5 @@
-import { inputManager, KeyCode } from './InputManager';
-import { NPCDialogue } from './NPCManager';
+import { inputManager, KeyCode } from './InputManager.js';
+import { NPCDialogue } from './NPCManager.js';
 
 /**
  * 对话选项接口

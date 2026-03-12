@@ -7,6 +7,9 @@
  * - 其他游戏设置
  */
 
+import { audioManager } from './AudioManager.js';
+import { uiTheme, ThemeMode } from './UITheme.js';
+
 /**
  * 设置操作
  */
@@ -97,8 +100,6 @@ export class SettingsUI {
    */
   private initOptions(): void {
     try {
-      const { audioManager } = require('./AudioManager');
-      const { uiTheme } = require('./UITheme');
 
       this.options = [
         {
@@ -295,8 +296,6 @@ export class SettingsUI {
    */
   private applySetting(option: SettingOption): void {
     try {
-      const { audioManager } = require('./AudioManager');
-      const { uiTheme } = require('./UITheme');
 
       switch (option.id) {
         case 'bgmVolume':
@@ -312,7 +311,7 @@ export class SettingsUI {
           break;
 
         case 'theme':
-          uiTheme.setTheme(option.value as 'light' | 'dark');
+          uiTheme.setTheme(option.value as ThemeMode);
           break;
       }
     } catch (error) {

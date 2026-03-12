@@ -185,6 +185,14 @@ export class AudioManager {
   /** 预加载的 BGM 缓存 */
   private bgmCache: Map<string, HTMLAudioElement> = new Map();
 
+  /** 已确认加载失败的 ID，避免每帧重复请求 */
+  private failedBGM = new Set<string>();
+  private failedSFX = new Set<string>();
+  private failedVoice = new Set<string>();
+
+  /** 已记录失败日志的路径，避免控制台刷屏 */
+  private loggedFailedPaths = new Set<string>();
+
   /** 配置 */
   private config: AudioManagerConfig;
 
@@ -271,8 +279,12 @@ export class AudioManager {
       this.audioContext = new AudioContextClass();
 
       // 尝试恢复音频上下文（浏览器需要用户交互才能播放音频）
+      // 注意：resume() 在无用户交互时可能一直挂起，用 Promise.race 超时避免阻塞加载
       if (this.audioContext && this.audioContext.state === 'suspended') {
-        await this.audioContext.resume();
+        await Promise.race([
+          this.audioContext.resume(),
+          new Promise<void>((resolve) => setTimeout(resolve, 500))
+        ]);
       }
 
       this.audioContextInitialized = true;
@@ -425,14 +437,14 @@ export class AudioManager {
       return;
     }
 
+    // 若此前已加载失败，直接返回，避免重复请求
+    if (this.failedBGM.has(id)) return;
+
     // 获取或创建 BGM 元素
     let audioElement = this.bgmCache.get(id);
     if (!audioElement) {
       audioElement = await this.loadBGM(id);
-      if (!audioElement) {
-        console.error(`[AudioManager] Failed to load BGM: ${id}`);
-        return;
-      }
+      if (!audioElement) return;
       this.bgmCache.set(id, audioElement);
     }
 
@@ -580,6 +592,10 @@ export class AudioManager {
     }
 
     // 获取或创建音效元素
+    // 若此前已加载失败，直接返回，避免每帧重复请求
+    const failedSet = type === AudioType.VOICE ? this.failedVoice : this.failedSFX;
+    if (failedSet.has(id)) return;
+
     const cache = type === AudioType.VOICE ? this.voiceCache : this.sfxCache;
     let audioElement = cache.get(id);
     if (!audioElement) {
@@ -588,10 +604,7 @@ export class AudioManager {
       } else {
         audioElement = await this.loadSFX(id);
       }
-      if (!audioElement) {
-        console.error(`[AudioManager] Failed to load ${type}: ${id}`);
-        return;
-      }
+      if (!audioElement) return;
       cache.set(id, audioElement);
     }
 
@@ -889,10 +902,14 @@ export class AudioManager {
     this.stopBGM(false);
     this.stopAllSFX();
 
-    // 清除缓存
+    // 清除缓存及失败记录
     this.bgmCache.clear();
     this.sfxCache.clear();
     this.voiceCache.clear();
+    this.failedBGM.clear();
+    this.failedSFX.clear();
+    this.failedVoice.clear();
+    this.loggedFailedPaths.clear();
 
     console.log('[AudioManager] Cache cleared');
   }
@@ -998,21 +1015,25 @@ export class AudioManager {
    * 加载 BGM
    */
   private async loadBGM(id: string): Promise<HTMLAudioElement | undefined> {
+    if (this.failedBGM.has(id)) return undefined;
     const path = `/assets/tuxemon/music/${id}.ogg`;
-    return this.loadAudio(path);
+    const element = await this.loadAudio(path);
+    if (!element) this.failedBGM.add(id);
+    return element;
   }
 
   /**
    * 加载音效
    */
   private async loadSFX(id: string): Promise<HTMLAudioElement | undefined> {
-    // 尝试多个格式
+    if (this.failedSFX.has(id)) return undefined;
     const formats = ['.ogg', '.wav', '.mp3'];
     for (const ext of formats) {
       const path = `/assets/tuxemon/sounds/${id}${ext}`;
       const element = await this.loadAudio(path);
       if (element) return element;
     }
+    this.failedSFX.add(id);
     return undefined;
   }
 
@@ -1020,36 +1041,41 @@ export class AudioManager {
    * 加载语音
    */
   private async loadVoice(id: string): Promise<HTMLAudioElement | undefined> {
-    // 尝试多个格式
+    if (this.failedVoice.has(id)) return undefined;
     const formats = ['.ogg', '.wav', '.mp3'];
     for (const ext of formats) {
       const path = `/assets/tuxemon/voice/${id}${ext}`;
       const element = await this.loadAudio(path);
       if (element) return element;
     }
+    this.failedVoice.add(id);
     return undefined;
   }
 
   /**
-   * 加载音频文件
+   * 加载音频文件（每个路径失败只记录一次日志）
    */
   private loadAudio(path: string): Promise<HTMLAudioElement | undefined> {
     return new Promise((resolve) => {
       const audio = new Audio(path);
 
       audio.addEventListener('canplaythrough', () => {
-        console.log(`[AudioManager] Loaded: ${path}`);
         resolve(audio);
       }, { once: true });
 
       audio.addEventListener('error', () => {
-        console.warn(`[AudioManager] Failed to load: ${path}`);
+        if (!this.loggedFailedPaths.has(path)) {
+          this.loggedFailedPaths.add(path);
+          console.warn(`[AudioManager] 音频缺失: ${path}`);
+        }
         resolve(undefined);
       }, { once: true });
 
-      // 超时处理
       setTimeout(() => {
-        console.warn(`[AudioManager] Timeout loading: ${path}`);
+        if (!this.loggedFailedPaths.has(path)) {
+          this.loggedFailedPaths.add(path);
+          console.warn(`[AudioManager] 加载超时: ${path}`);
+        }
         resolve(undefined);
       }, 10000);
     });

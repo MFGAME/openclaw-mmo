@@ -11,9 +11,9 @@
  * - 与 ShopManager.ts 集成
  */
 
-import { ShopManager, ShopItem, ShopData, ShopFilter } from '../engine/ShopManager';
-import { ItemData, ItemCategory } from '../engine/ItemData';
-import { CurrencySystem, CurrencyType } from '../engine/CurrencySystem';
+import { ShopManager, ShopItem, ShopData, ShopFilter } from '../engine/ShopManager.js';
+import { ItemData, ItemCategory } from '../engine/ItemData.js';
+import { CurrencySystem, CurrencyType } from '../engine/CurrencySystem.js';
 
 /**
  * 商店 UI 模式
